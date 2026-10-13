@@ -3,12 +3,13 @@ import { Pressable, Text, TextInput, SafeAreaView, Ionicons, useLocale } from '.
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Animated, { cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { useReducedMotion } from 'react-native-reanimated';
 import { Message, Sender } from './conversation-model';
 import type { useSpeechInput } from './use-speech-input';
 import { colors } from './theme';
 import { FtfMotion } from './ftf-motion';
+import { PartnerKeyboard } from './partner-keyboard';
 
 const phrases = ['Yes', 'No', 'Thank you', 'Please call my family', 'Please type your response', 'Please help me'];
 type Props = {
@@ -32,6 +33,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
   const recordingSender = voice.busy ? voice.owner : null;
   const [reading, setReading] = useState<{ sender: Sender; id: number } | null>(null);
   const [barOwner, setBarOwner] = useState<Sender>('you');
+  const [activeTyping, setActiveTyping] = useState<'none' | 'you' | 'partner'>('none');
   const initialLastId = useRef(messages.at(-1)?.id ?? 0);
   const youInput = useRef<TextInput>(null);
   const partnerInput = useRef<TextInput>(null);
@@ -41,20 +43,53 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
   const partnerScroll = useRef<ScrollView>(null);
   const reducedMotion = useReducedMotion();
   const scrollFrames = useRef<Partial<Record<Sender, number>>>({});
+
+  const topFlex = useSharedValue(1);
+  const bottomFlex = useSharedValue(1);
+
+  useEffect(() => {
+    cancelAnimation(topFlex);
+    cancelAnimation(bottomFlex);
+    if (reducedMotion) {
+      topFlex.value = activeTyping === 'partner' ? 3.5 : activeTyping === 'you' ? 1 : 1;
+      bottomFlex.value = activeTyping === 'you' ? 3.5 : activeTyping === 'partner' ? 1 : 1;
+      return;
+    }
+    if (activeTyping === 'partner') {
+      topFlex.value = withTiming(3.5, { duration: 320 });
+      bottomFlex.value = withTiming(1, { duration: 320 });
+    } else if (activeTyping === 'you') {
+      topFlex.value = withTiming(1, { duration: 320 });
+      bottomFlex.value = withTiming(3.5, { duration: 320 });
+    } else {
+      topFlex.value = withTiming(1, { duration: 320 });
+      bottomFlex.value = withTiming(1, { duration: 320 });
+    }
+  }, [activeTyping, reducedMotion, topFlex, bottomFlex]);
+
+  const topMotion = useAnimatedStyle(() => ({
+    flex: topFlex.value,
+  }));
+
+  const bottomMotion = useAnimatedStyle(() => ({
+    flex: bottomFlex.value,
+  }));
+
   const scrollToLatest = useCallback((sender: Sender, animated = true) => {
     const pending = scrollFrames.current[sender];
     if (pending !== undefined) cancelAnimationFrame(pending);
-    // Wait for the new viewport/content layout, including a keyboard or phrase-picker change.
     scrollFrames.current[sender] = requestAnimationFrame(() => {
       (sender === 'you' ? youScroll : partnerScroll).current?.scrollToEnd({ animated: animated && !reducedMotion });
     });
   }, [reducedMotion]);
+
   useEffect(() => { playback.current++; setReading(null); void Speech.stop().catch(() => {}); }, [language]);
   const lastMessageId = messages.at(-1)?.id;
   useEffect(() => {
     scrollToLatest('you');
     scrollToLatest('partner');
-  }, [lastMessageId, editor?.sender, scrollToLatest]);
+  }, [lastMessageId, editor?.sender, activeTyping, scrollToLatest]);
+
   useEffect(() => () => {
     Object.values(scrollFrames.current).forEach(cancelAnimationFrame);
     playback.current++;
@@ -67,6 +102,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
     if (reading) setNotice(previous => ({ ...previous, [reading.sender]: 'Reading stopped.' }));
     try { await Speech.stop(); } catch { /* An unavailable speech engine is reported by Read. */ }
   };
+
   const read = async (sender: Sender, message: Message) => {
     const value = message.text;
     setBarOwner(sender);
@@ -90,6 +126,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
       });
     } catch { finish('Audio unavailable on this device. The message is still visible.'); }
   };
+
   const startVoice = (sender: Sender) => {
     if (voice.busy) return;
     void stopRead();
@@ -98,6 +135,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
     setNotice(previous => ({ ...previous, [sender]: undefined }));
     voice.start(sender, drafts[sender], speechLocale);
   };
+
   const send = (sender: Sender, value: string, clearDraft = false) => {
     if (!value.trim()) return;
     setBarOwner(sender);
@@ -112,113 +150,463 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
     const scroll = sender === 'you' ? youScroll : partnerScroll;
     const input = sender === 'you' ? youInput : partnerInput;
     const choosing = editor?.sender === sender && editor.mode === 'phrases';
-    return <View key={sender} testID={'ftf-panel-' + sender} style={[s.half, sender === 'partner' && s.rotated]}>
-      <View style={[s.identity, compact && s.identityCompact]}>
-        {!compact && <View style={s.identityIcon}><Ionicons name="person-outline" size={20} color={colors.primaryDark} accessible={false} /></View>}
-        <View style={[s.identityText, compact && s.identityTextCompact]}><Text style={s.name}>{name}<Text style={s.personCode}>  /  {sender === 'you' ? 'A' : 'B'}</Text></Text><Text style={s.profile}>{labels[sender]}</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel={name + ': ' + t('Speech language') + ': ' + t(speechLocale === 'ur-PK' ? 'Urdu' : 'English') + '. ' + t('Switch language')} accessibilityState={{ disabled: voice.busy }} disabled={voice.busy} onPress={onSpeechLocale} style={s.languageButton}><Ionicons name="language-outline" size={16} color={colors.primaryDark} accessible={false}/><Text style={s.languageText}>{speechLocale === 'ur-PK' ? 'اردو' : 'EN'}</Text></Pressable>
-      </View>
+    const isCompressed = (sender === 'partner' && activeTyping === 'you') || (sender === 'you' && activeTyping === 'partner');
 
-      {choosing ? <View testID={'ftf-phrases-' + sender} style={s.picker}>
-        <View style={s.pickerHeading}><View style={{ flex: 1 }}><Text accessibilityRole="header" style={s.pickerTitle}>Quick phrases</Text><Text style={s.pickerHint}>{t('Tap to send as {name}', { name })} · {t('Not your chat history')}</Text></View><IconButton icon="close" label={name + ': ' + t('Close phrases')} onPress={() => setEditor(null)} /></View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.phrases}>
-          {phrases.map(phrase => <Pressable key={phrase} accessibilityRole="button" accessibilityLabel={t('Send as {name}', { name }) + ': ' + t(phrase)} onPress={() => send(sender, t(phrase))} style={({ pressed }) => [s.phrase, pressed && s.pressed]}><Text style={s.phraseText}>{phrase}</Text><Ionicons name="arrow-up" size={16} color={colors.primaryDark} accessible={false} /></Pressable>)}
-        </ScrollView>
-      </View> : <ScrollView ref={scroll} testID={'ftf-history-' + sender} style={s.history} keyboardShouldPersistTaps="handled" contentContainerStyle={[s.messages, compact && s.messagesCompact]}
-        onLayout={() => scrollToLatest(sender, false)} onContentSizeChange={() => scrollToLatest(sender)}>
-        {messages.length === 0 && <Text style={s.empty}>Your conversation starts here. Type a message or choose a phrase.</Text>}
-        {messages.map(message => {
-          const own = message.sender === sender;
-          const playing = reading?.sender === sender && reading.id === message.id;
-          return <FtfMotion key={message.id} enter={message.id > initialLastId.current} style={[s.messageRow, own && s.ownRow]}>
-            <View testID={'ftf-' + sender + '-message-' + message.id} accessibilityLabel={t(own ? 'Sent by {name}' : 'Received by {name}', { name }) + ': ' + message.text} style={[s.bubble, own ? s.outgoing : s.incoming]}>
-              <Text verbatim style={[s.message, /[؀-ۿ]/.test(message.text) && s.rtl]}>{message.text}</Text>
+    if (isCompressed) {
+      return (
+        <Pressable
+          testID={'ftf-compact-' + sender}
+          accessibilityRole="button"
+          accessibilityLabel={name + ': ' + t('Tap to expand')}
+          onPress={() => {
+            setBarOwner(sender);
+            setActiveTyping(sender);
+            if (sender === 'you') {
+              youInput.current?.focus();
+            }
+          }}
+          style={s.compactBar}
+        >
+          <View style={s.compactIdentity}>
+            <View style={s.compactAvatar}>
+              <Ionicons name="person" size={15} color={colors.primaryDark} accessible={false} />
             </View>
-            {!own && <IconButton icon={playing ? 'stop-outline' : 'volume-medium-outline'} label={name + ': ' + (playing ? t('Stop audio') : t('Read aloud') + ': ' + message.text)} selected={playing} disabled={voice.busy} onPress={() => void read(sender, message)} />}
-          </FtfMotion>;
-        })}
-      </ScrollView>}
-
-      <View style={[s.dock, compact && s.dockCompact]}>
-        {(!!notice[sender] || voice.owner === sender && !!voice.message) && <ScrollView style={s.status} keyboardShouldPersistTaps="handled">
-          {!!notice[sender] && !(compact && /^(Sent to|Finished reading|Reading stopped)/.test(notice[sender]!)) && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice[sender]}</Text>}
-          {voice.owner === sender && !!voice.message && <View style={s.voiceNotice}><Text accessibilityLiveRegion="polite" style={[s.notice, { flex: 1 }]}>{voice.message}</Text>{!voice.busy && <IconButton icon="close" label={name + ': ' + t('Dismiss voice notice')} onPress={voice.clearFeedback} />}</View>}
-          {recordingSender === sender && !!voice.preview && <Text verbatim style={s.voicePreview}>{voice.preview}</Text>}
-        </ScrollView>}
-        <View style={s.composer}>
-          <IconButton icon={recordingSender === sender ? 'stop-outline' : 'mic-outline'} label={name + ': ' + t(recordingSender === sender ? 'Stop voice input' : 'Start voice input')} selected={recordingSender === sender} disabled={voice.busy && recordingSender !== sender} onPress={() => recordingSender === sender ? voice.stop() : startVoice(sender)} />
-          <View style={[s.inputShell, !!drafts[sender].trim() && s.inputActive]}>
-            <TextInput ref={input} testID={'ftf-input-' + sender} accessibilityLabel={t('FTF message from {name}', { name })} editable={!voice.busy} value={drafts[sender]} onChangeText={value => onDraft(sender, value)}
-              onFocus={() => { setBarOwner(sender); setEditor(null); }} placeholder="Type a message…" placeholderTextColor={colors.muted} multiline style={s.input} />
-            {!!drafts[sender].trim() && <IconButton icon="arrow-up" label={name + ': ' + t('Send')} selected disabled={voice.busy} onPress={() => send(sender, drafts[sender], true)} />}
+            <Text style={s.compactName}>{name}</Text>
+            <Text style={s.compactStatus}>
+              · {t(sender === 'you' ? 'Partner typing' : 'You typing')}
+            </Text>
           </View>
-          <IconButton icon={recordingSender === sender || choosing ? 'close' : 'chatbubble-ellipses-outline'} label={name + ': ' + t(recordingSender === sender ? 'Cancel voice input' : choosing ? 'Close phrases' : 'Phrases')} selected={choosing} disabled={voice.busy && recordingSender !== sender}
-            onPress={() => { if (recordingSender === sender) { voice.cancel(); return; } setBarOwner(sender); setEditor(choosing ? null : { sender, mode: 'phrases' }); }} />
+          <View style={s.compactAction}>
+            <Text style={s.compactActionText}>{t('Tap to expand')}</Text>
+            <Ionicons name={sender === 'partner' ? 'chevron-down' : 'chevron-up'} size={16} color={colors.primaryDark} accessible={false} />
+          </View>
+        </Pressable>
+      );
+    }
+
+    return (
+      <View testID={'ftf-panel-' + sender} style={s.panelContent}>
+        <View style={[s.identity, compact && s.identityCompact]}>
+          {!compact && (
+            <View style={s.identityIcon}>
+              <Ionicons name="person-outline" size={20} color={colors.primaryDark} accessible={false} />
+            </View>
+          )}
+          <View style={[s.identityText, compact && s.identityTextCompact]}>
+            <Text style={s.name}>
+              {name}
+              <Text style={s.personCode}>  /  {sender === 'you' ? 'A' : 'B'}</Text>
+            </Text>
+            <Text style={s.profile}>{labels[sender]}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={name + ': ' + t('Speech language') + ': ' + t(speechLocale === 'ur-PK' ? 'Urdu' : 'English') + '. ' + t('Switch language')}
+            accessibilityState={{ disabled: voice.busy }}
+            disabled={voice.busy}
+            onPress={onSpeechLocale}
+            style={s.languageButton}
+          >
+            <Ionicons name="language-outline" size={16} color={colors.primaryDark} accessible={false} />
+            <Text style={s.languageText}>{speechLocale === 'ur-PK' ? 'اردو' : 'EN'}</Text>
+          </Pressable>
         </View>
-        {!compact && <Text style={s.privacyHint}>Device speech may process audio online.</Text>}
+
+        {choosing ? (
+          <View testID={'ftf-phrases-' + sender} style={s.picker}>
+            <View style={s.pickerHeading}>
+              <View style={{ flex: 1 }}>
+                <Text accessibilityRole="header" style={s.pickerTitle}>Quick phrases</Text>
+                <Text style={s.pickerHint}>{t('Tap to send as {name}', { name })} · {t('Not your chat history')}</Text>
+              </View>
+              <IconButton icon="close" label={name + ': ' + t('Close phrases')} onPress={() => setEditor(null)} />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.phrases}>
+              {phrases.map(phrase => (
+                <Pressable
+                  key={phrase}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('Send as {name}', { name }) + ': ' + t(phrase)}
+                  onPress={() => send(sender, t(phrase))}
+                  style={({ pressed }) => [s.phrase, pressed && s.pressed]}
+                >
+                  <Text style={s.phraseText}>{phrase}</Text>
+                  <Ionicons name="arrow-up" size={16} color={colors.primaryDark} accessible={false} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : (
+          <ScrollView
+            ref={scroll}
+            testID={'ftf-history-' + sender}
+            style={s.history}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[s.messages, compact && s.messagesCompact]}
+            onLayout={() => scrollToLatest(sender, false)}
+            onContentSizeChange={() => scrollToLatest(sender)}
+          >
+            {messages.length === 0 && <Text style={s.empty}>Your conversation starts here. Type a message or choose a phrase.</Text>}
+            {messages.map(message => {
+              const own = message.sender === sender;
+              const playing = reading?.sender === sender && reading.id === message.id;
+              return (
+                <FtfMotion key={message.id} enter={message.id > initialLastId.current} style={[s.messageRow, own && s.ownRow]}>
+                  <View
+                    testID={'ftf-' + sender + '-message-' + message.id}
+                    accessibilityLabel={t(own ? 'Sent by {name}' : 'Received by {name}', { name }) + ': ' + message.text}
+                    style={[s.bubble, own ? s.outgoing : s.incoming]}
+                  >
+                    <Text verbatim style={[s.message, /[؀-ۿ]/.test(message.text) && s.rtl]}>{message.text}</Text>
+                  </View>
+                  {!own && (
+                    <IconButton
+                      icon={playing ? 'stop-outline' : 'volume-medium-outline'}
+                      label={name + ': ' + (playing ? t('Stop audio') : t('Read aloud') + ': ' + message.text)}
+                      selected={playing}
+                      disabled={voice.busy}
+                      onPress={() => void read(sender, message)}
+                    />
+                  )}
+                </FtfMotion>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        <View style={[s.dock, compact && s.dockCompact]}>
+          {(!!notice[sender] || voice.owner === sender && !!voice.message) && (
+            <ScrollView style={s.status} keyboardShouldPersistTaps="handled">
+              {!!notice[sender] && !(compact && /^(Sent to|Finished reading|Reading stopped)/.test(notice[sender]!)) && (
+                <Text accessibilityLiveRegion="polite" style={s.notice}>{notice[sender]}</Text>
+              )}
+              {voice.owner === sender && !!voice.message && (
+                <View style={s.voiceNotice}>
+                  <Text accessibilityLiveRegion="polite" style={[s.notice, { flex: 1 }]}>{voice.message}</Text>
+                  {!voice.busy && <IconButton icon="close" label={name + ': ' + t('Dismiss voice notice')} onPress={voice.clearFeedback} />}
+                </View>
+              )}
+              {recordingSender === sender && !!voice.preview && <Text verbatim style={s.voicePreview}>{voice.preview}</Text>}
+            </ScrollView>
+          )}
+
+          {sender === 'partner' && activeTyping === 'partner' ? (
+            <View style={s.partnerTypingContainer}>
+              <View style={s.partnerDraftRow}>
+                <View style={s.partnerDraftBox}>
+                  <Text verbatim style={[s.partnerDraftText, /[؀-ۿ]/.test(drafts.partner) && s.rtl]}>
+                    {drafts.partner || t('Type a message…')}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="close"
+                  label={t('Close keyboard')}
+                  onPress={() => setActiveTyping('none')}
+                />
+              </View>
+              <PartnerKeyboard
+                value={drafts.partner}
+                onChangeText={val => onDraft('partner', val)}
+                onSend={val => {
+                  send('partner', val, true);
+                  setActiveTyping('none');
+                }}
+                onClose={() => setActiveTyping('none')}
+                defaultLanguage={language === 'اردو' ? 'ur' : 'en'}
+              />
+            </View>
+          ) : (
+            <View style={s.composer}>
+              <IconButton
+                icon={recordingSender === sender ? 'stop-outline' : 'mic-outline'}
+                label={name + ': ' + t(recordingSender === sender ? 'Stop voice input' : 'Start voice input')}
+                selected={recordingSender === sender}
+                disabled={voice.busy && recordingSender !== sender}
+                onPress={() => recordingSender === sender ? voice.stop() : startVoice(sender)}
+              />
+
+              {sender === 'partner' ? (
+                <Pressable
+                  testID={'ftf-input-' + sender}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('FTF message from {name}', { name })}
+                  onPress={() => {
+                    setBarOwner('partner');
+                    setEditor(null);
+                    setActiveTyping('partner');
+                  }}
+                  style={[s.inputShell, !!drafts[sender].trim() && s.inputActive]}
+                >
+                  <Text style={[s.inputPlaceholder, !!drafts[sender].trim() && s.inputText]}>
+                    {drafts[sender].trim() || t('Type a message…')}
+                  </Text>
+                  <Ionicons name="keypad-outline" size={20} color={colors.primaryDark} style={{ marginRight: 12 }} />
+                  {!!drafts[sender].trim() && (
+                    <IconButton
+                      icon="arrow-up"
+                      label={name + ': ' + t('Send')}
+                      selected
+                      disabled={voice.busy}
+                      onPress={() => send(sender, drafts[sender], true)}
+                    />
+                  )}
+                </Pressable>
+              ) : (
+                <View style={[s.inputShell, !!drafts[sender].trim() && s.inputActive]}>
+                  <TextInput
+                    ref={input}
+                    testID={'ftf-input-' + sender}
+                    accessibilityLabel={t('FTF message from {name}', { name })}
+                    editable={!voice.busy}
+                    value={drafts[sender]}
+                    onChangeText={value => onDraft(sender, value)}
+                    onFocus={() => {
+                      setBarOwner(sender);
+                      setEditor(null);
+                      setActiveTyping('you');
+                    }}
+                    onBlur={() => {
+                      if (activeTyping === 'you' && !drafts.you.trim()) {
+                        setActiveTyping('none');
+                      }
+                    }}
+                    placeholder={t('Type a message…')}
+                    placeholderTextColor={colors.muted}
+                    multiline
+                    style={s.input}
+                  />
+                  {!!drafts[sender].trim() && (
+                    <IconButton
+                      icon="arrow-up"
+                      label={name + ': ' + t('Send')}
+                      selected
+                      disabled={voice.busy}
+                      onPress={() => {
+                        send(sender, drafts[sender], true);
+                        setActiveTyping('none');
+                      }}
+                    />
+                  )}
+                </View>
+              )}
+
+              <IconButton
+                icon={recordingSender === sender || choosing ? 'close' : 'chatbubble-ellipses-outline'}
+                label={name + ': ' + t(recordingSender === sender ? 'Cancel voice input' : choosing ? 'Close phrases' : 'Phrases')}
+                selected={choosing}
+                disabled={voice.busy && recordingSender !== sender}
+                onPress={() => {
+                  if (recordingSender === sender) {
+                    voice.cancel();
+                    return;
+                  }
+                  setBarOwner(sender);
+                  setEditor(choosing ? null : { sender, mode: 'phrases' });
+                }}
+              />
+            </View>
+          )}
+
+          {!compact && activeTyping !== 'partner' && <Text style={s.privacyHint}>Device speech may process audio online.</Text>}
+        </View>
       </View>
-    </View>;
+    );
   };
 
-  return <SafeAreaView style={s.safe}>
-    <KeyboardAvoidingView style={s.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {panel('partner')}
-      <View style={s.dividerFrame}>
-        <FtfMotion rotation={barOwner === 'partner' ? 180 : 0} style={[s.divider, compact && s.dividerCompact]}>
-          <IconButton icon="arrow-back" label="Back" inverse onPress={onBack} />
-          <Pressable testID="ftf-flip" accessibilityRole="button" accessibilityLabel={t('Flip central controls to {name}', { name: t(barOwner === 'you' ? 'Partner' : 'You') })} accessibilityHint="Only the central navigation rotates. Message senders stay the same."
-            onPress={() => setBarOwner(previous => previous === 'you' ? 'partner' : 'you')} style={({ pressed }) => [s.flip, pressed && s.pressed]}>
-            <View style={s.modeRow}><Text style={s.mode}>Face to face</Text><Ionicons name="sync-outline" size={16} color={colors.surface} accessible={false} /></View>
-            <Text style={s.flipHint}>{t('Facing {name}', { name: t(barOwner === 'you' ? 'You' : 'Partner') })} · {t('Tap to flip')}</Text>
-          </Pressable>
-          <IconButton icon="chatbubbles-outline" label="Back to chat" inverse onPress={onChat} />
-        </FtfMotion>
-      </View>
-      {panel('you')}
-    </KeyboardAvoidingView>
-  </SafeAreaView>;
+  return (
+    <SafeAreaView style={s.safe}>
+      <KeyboardAvoidingView style={s.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Animated.View style={[s.half, s.rotated, topMotion]}>
+          {panel('partner')}
+        </Animated.View>
+
+        <View style={s.dividerFrame}>
+          <FtfMotion rotation={barOwner === 'partner' ? 180 : 0} style={[s.divider, compact && s.dividerCompact]}>
+            <IconButton icon="arrow-back" label="Back" inverse onPress={onBack} />
+            <Pressable
+              testID="ftf-flip"
+              accessibilityRole="button"
+              accessibilityLabel={activeTyping !== 'none' ? t('Restore split view') : t('Flip central controls to {name}', { name: t(barOwner === 'you' ? 'Partner' : 'You') })}
+              accessibilityHint="Only the central navigation rotates. Message senders stay the same."
+              onPress={() => {
+                if (activeTyping !== 'none') {
+                  setActiveTyping('none');
+                } else {
+                  setBarOwner(previous => (previous === 'you' ? 'partner' : 'you'));
+                }
+              }}
+              style={({ pressed }) => [s.flip, pressed && s.pressed]}
+            >
+              <View style={s.modeRow}>
+                <Text style={s.mode}>{activeTyping !== 'none' ? t('Restore split view') : 'Face to face'}</Text>
+                <Ionicons
+                  name={activeTyping !== 'none' ? 'contract-outline' : 'sync-outline'}
+                  size={16}
+                  color={colors.surface}
+                  accessible={false}
+                />
+              </View>
+              <Text style={s.flipHint}>
+                {activeTyping !== 'none'
+                  ? t('Tap to return to 50/50')
+                  : t('Facing {name}', { name: t(barOwner === 'you' ? 'You' : 'Partner') }) + ' · ' + t('Tap to flip')}
+              </Text>
+            </Pressable>
+            <IconButton icon="chatbubbles-outline" label="Back to chat" inverse onPress={onChat} />
+          </FtfMotion>
+        </View>
+
+        <Animated.View style={[s.half, bottomMotion]}>
+          {panel('you')}
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
 
 function IconButton({ icon, label, selected = false, inverse = false, disabled = false, onPress }: {
   icon: keyof typeof Ionicons.glyphMap; label: string; selected?: boolean; inverse?: boolean; disabled?: boolean; onPress(): void;
 }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress}
-    style={({ pressed }) => [s.iconButton, selected && s.iconSelected, inverse && s.iconInverse, (disabled || pressed) && s.pressed]}>
-    <Ionicons name={icon} size={22} color={selected || inverse ? colors.surface : colors.primaryDark} accessible={false} />
-  </Pressable>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled, selected }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [s.iconButton, selected && s.iconSelected, inverse && s.iconInverse, (disabled || pressed) && s.pressed]}
+    >
+      <Ionicons name={icon} size={22} color={selected || inverse ? colors.surface : colors.primaryDark} accessible={false} />
+    </Pressable>
+  );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream }, half: { flex: 1, minHeight: 0, overflow: 'hidden' }, rotated: { transform: [{ rotate: '180deg' }] },
+  safe: { flex: 1, backgroundColor: colors.cream },
+  half: { minHeight: 0, overflow: 'hidden' },
+  panelContent: { flex: 1, minHeight: 0 },
+  rotated: { transform: [{ rotate: '180deg' }] },
   identity: { minHeight: 56, paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.line },
   identityIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  identityText: { flex: 1, minWidth: 0 }, name: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.ink }, personCode: { fontSize: 12, fontWeight: '500', color: colors.muted },
-  identityCompact: { minHeight: 44, paddingVertical: 0 }, identityTextCompact: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  profile: { fontSize: 12, lineHeight: 17, color: colors.muted }, localLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.6, color: colors.primaryDark },
-  history: { flex: 1, minHeight: 0 }, messages: { padding: 16, gap: 12, flexGrow: 1 }, empty: { fontSize: 16, lineHeight: 24, color: colors.muted },
+  identityText: { flex: 1, minWidth: 0 },
+  name: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: colors.ink },
+  personCode: { fontSize: 12, fontWeight: '500', color: colors.muted },
+  identityCompact: { minHeight: 44, paddingVertical: 0 },
+  identityTextCompact: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  profile: { fontSize: 12, lineHeight: 17, color: colors.muted },
+  history: { flex: 1, minHeight: 0 },
+  messages: { padding: 16, gap: 12, flexGrow: 1 },
+  empty: { fontSize: 16, lineHeight: 24, color: colors.muted },
   messagesCompact: { paddingVertical: 4, gap: 8 },
-  messageRow: { width: '100%', flexDirection: 'row', gap: 8, alignItems: 'center' }, ownRow: { justifyContent: 'flex-end' },
+  messageRow: { width: '100%', flexDirection: 'row', gap: 8, alignItems: 'center' },
+  ownRow: { justifyContent: 'flex-end' },
   bubble: { flexShrink: 1, maxWidth: '84%', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, borderRadius: 18, borderWidth: 1 },
-  incoming: { backgroundColor: colors.surface, borderColor: colors.line, borderBottomLeftRadius: 5 }, outgoing: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight, borderBottomRightRadius: 5 },
-  message: { fontSize: 17, lineHeight: 24, color: colors.ink, fontWeight: '400' }, rtl: { writingDirection: 'rtl', textAlign: 'right' },
+  incoming: { backgroundColor: colors.surface, borderColor: colors.line, borderBottomLeftRadius: 5 },
+  outgoing: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight, borderBottomRightRadius: 5 },
+  message: { fontSize: 17, lineHeight: 24, color: colors.ink, fontWeight: '400' },
+  rtl: { writingDirection: 'rtl', textAlign: 'right' },
   dock: { backgroundColor: colors.surface, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderTopWidth: 1, borderColor: colors.line },
-  dockCompact: { paddingVertical: 4 }, dividerCompact: { minHeight: 56, paddingVertical: 4 },
-  composer: { flexDirection: 'row', alignItems: 'center', gap: 8 }, inputShell: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.cream, flexDirection: 'row', alignItems: 'center' },
-  inputActive: { borderColor: colors.primary }, input: { flex: 1, minWidth: 0, height: 48, paddingHorizontal: 12, paddingVertical: 12, color: colors.ink, fontSize: 16, lineHeight: 22 },
+  dockCompact: { paddingVertical: 4 },
+  dividerCompact: { minHeight: 56, paddingVertical: 4 },
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inputShell: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.cream, flexDirection: 'row', alignItems: 'center' },
+  inputActive: { borderColor: colors.primary },
+  input: { flex: 1, minWidth: 0, height: 48, paddingHorizontal: 12, paddingVertical: 12, color: colors.ink, fontSize: 16, lineHeight: 22 },
+  inputPlaceholder: { flex: 1, minWidth: 0, paddingHorizontal: 12, color: colors.muted, fontSize: 16 },
+  inputText: { color: colors.ink },
   iconButton: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  iconSelected: { backgroundColor: colors.primaryDark }, iconInverse: { backgroundColor: colors.emeraldBlack }, pressed: { opacity: 0.55 },
-  dockHint: { fontSize: 11, lineHeight: 16, color: colors.muted, textAlign: 'center', marginTop: 4 },
+  iconSelected: { backgroundColor: colors.primaryDark },
+  iconInverse: { backgroundColor: colors.emeraldBlack },
+  pressed: { opacity: 0.55 },
   notice: { fontSize: 12, lineHeight: 17, color: colors.primaryDark, marginBottom: 6 },
   voicePreview: { fontSize: 14, lineHeight: 20, color: colors.ink, marginBottom: 6 },
   status: { maxHeight: 64, flexGrow: 0 },
   voiceNotice: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  languageButton: { minHeight: 44, minWidth: 48, flexDirection: 'row', gap: 4, justifyContent: 'center', alignItems: 'center' }, languageText: { fontSize: 12, fontWeight: '600', color: colors.primaryDark }, privacyHint: { fontSize: 10, lineHeight: 14, color: colors.muted, textAlign: 'center', marginTop: 4 },
-  dividerFrame: { backgroundColor: colors.primaryDark, zIndex: 2 }, divider: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  flip: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', gap: 3 }, modeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mode: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.surface }, flipHint: { fontSize: 11, lineHeight: 15, color: colors.primaryLight },
-  picker: { flex: 1, minHeight: 0, backgroundColor: colors.mint, borderTopWidth: 2, borderTopColor: colors.mintBright }, pickerHeading: { paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.mintBright },
+  languageButton: { minHeight: 44, minWidth: 48, flexDirection: 'row', gap: 4, justifyContent: 'center', alignItems: 'center' },
+  languageText: { fontSize: 12, fontWeight: '600', color: colors.primaryDark },
+  privacyHint: { fontSize: 10, lineHeight: 14, color: colors.muted, textAlign: 'center', marginTop: 4 },
+  dividerFrame: { backgroundColor: colors.primaryDark, zIndex: 2 },
+  divider: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flip: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', gap: 3 },
+  modeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mode: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.surface },
+  flipHint: { fontSize: 11, lineHeight: 15, color: colors.primaryLight },
+  picker: { flex: 1, minHeight: 0, backgroundColor: colors.mint, borderTopWidth: 2, borderTopColor: colors.mintBright },
+  pickerHeading: { paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.mintBright },
   pickerHint: { fontSize: 11, lineHeight: 16, color: colors.ink, marginTop: 2 },
-  pickerTitle: { fontSize: 16, fontWeight: '700', color: colors.ink }, phrases: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  pickerTitle: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  phrases: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   phrase: { minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   phraseText: { flex: 1, fontSize: 15, lineHeight: 22, color: colors.ink },
+
+  /* Dynamic Area Expansion & In-App Keyboard Styles */
+  compactBar: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F3FB',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: colors.line,
+  },
+  compactIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  compactAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  compactStatus: {
+    fontSize: 12,
+    color: colors.muted,
+  },
+  compactAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  compactActionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primaryDark,
+  },
+  partnerTypingContainer: {
+    gap: 8,
+  },
+  partnerDraftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  partnerDraftBox: {
+    flex: 1,
+    minHeight: 44,
+    backgroundColor: colors.cream,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
+  partnerDraftText: {
+    fontSize: 16,
+    color: colors.ink,
+  },
 });
