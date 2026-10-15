@@ -9,16 +9,66 @@ export function useLocale() {
   const { language } = useApp();
   return { language, rtl: localeDirection(language) === 'rtl', t: (source: string, params?: Record<string, string | number>) => translate(language, source, params) };
 }
+function scaleUrduFontSize(baseSize: number = 14): number {
+  if (baseSize <= 12) return baseSize + 3;
+  if (baseSize <= 16) return Math.round(baseSize * 1.22);
+  return Math.round(baseSize * 1.18);
+}
+
 /** App-owned copy is translated; names, phone numbers and authored text explicitly opt out. */
 export const Text = forwardRef<NativeText, TextProps & { verbatim?: boolean }>(function Text({ children, style, verbatim = false, ...props }, ref) {
   const { language, rtl, t } = useLocale();
   const flat = StyleSheet.flatten(style);
-  return <NativeText {...props} ref={ref} accessibilityLabel={props.accessibilityLabel ? t(props.accessibilityLabel) : undefined} style={[style, rtl && !verbatim && { writingDirection: 'rtl', letterSpacing: 0, textTransform: 'none', lineHeight: Math.max(flat?.lineHeight ?? 0, (flat?.fontSize ?? 14) * 1.6) }]}>{React.Children.map(children, child => typeof child === 'string' ? uiText(language, child, verbatim) : child)}</NativeText>;
+  const isUrdu = (rtl && !verbatim) || (typeof children === 'string' && /[؀-ۿ]/.test(children));
+  const baseSize = flat?.fontSize ?? 14;
+  const scaledSize = isUrdu ? scaleUrduFontSize(baseSize) : undefined;
+  const scaledLineHeight = isUrdu
+    ? Math.max(flat?.lineHeight ? Math.round(scaleUrduFontSize(flat.lineHeight) * 1.05) : 0, Math.round((scaledSize ?? baseSize) * 1.6))
+    : undefined;
+
+  return (
+    <NativeText
+      {...props}
+      ref={ref}
+      accessibilityLabel={props.accessibilityLabel ? t(props.accessibilityLabel) : undefined}
+      style={[
+        style,
+        isUrdu && {
+          writingDirection: 'rtl',
+          letterSpacing: 0,
+          textTransform: 'none',
+          fontSize: scaledSize,
+          lineHeight: scaledLineHeight,
+        },
+      ]}
+    >
+      {React.Children.map(children, child => typeof child === 'string' ? uiText(language, child, verbatim) : child)}
+    </NativeText>
+  );
 });
 export type TextInput = NativeInput;
 export const TextInput = forwardRef<NativeInput, TextInputProps>(function TextInput(props, ref) {
   const { t, rtl } = useLocale();
-  return <NativeInput {...props} ref={ref} placeholder={props.placeholder ? t(props.placeholder) : undefined} accessibilityLabel={props.accessibilityLabel ? t(props.accessibilityLabel) : undefined} accessibilityHint={props.accessibilityHint ? t(props.accessibilityHint) : undefined} style={[rtl && { textAlign: 'right', writingDirection: 'rtl' }, props.style]}/>;
+  const flat = StyleSheet.flatten(props.style);
+  const baseSize = flat?.fontSize ?? 15;
+  const scaledSize = rtl ? scaleUrduFontSize(baseSize) : undefined;
+  return (
+    <NativeInput
+      {...props}
+      ref={ref}
+      placeholder={props.placeholder ? t(props.placeholder) : undefined}
+      accessibilityLabel={props.accessibilityLabel ? t(props.accessibilityLabel) : undefined}
+      accessibilityHint={props.accessibilityHint ? t(props.accessibilityHint) : undefined}
+      style={[
+        props.style,
+        rtl && {
+          textAlign: 'right',
+          writingDirection: 'rtl',
+          fontSize: scaledSize,
+        },
+      ]}
+    />
+  );
 });
 export const Pressable = forwardRef<React.ComponentRef<typeof NativePressable>, PressableProps>(function Pressable(props, ref) {
   const { t } = useLocale();
