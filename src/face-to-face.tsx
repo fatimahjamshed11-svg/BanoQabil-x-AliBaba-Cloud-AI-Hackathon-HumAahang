@@ -51,16 +51,16 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
     cancelAnimation(topFlex);
     cancelAnimation(bottomFlex);
     if (reducedMotion) {
-      topFlex.value = activeTyping === 'partner' ? 3.5 : activeTyping === 'you' ? 1 : 1;
-      bottomFlex.value = activeTyping === 'you' ? 3.5 : activeTyping === 'partner' ? 1 : 1;
+      topFlex.value = activeTyping === 'partner' ? 14 : activeTyping === 'you' ? 1 : 1;
+      bottomFlex.value = activeTyping === 'you' ? 14 : activeTyping === 'partner' ? 1 : 1;
       return;
     }
     if (activeTyping === 'partner') {
-      topFlex.value = withTiming(3.5, { duration: 320 });
+      topFlex.value = withTiming(14, { duration: 320 });
       bottomFlex.value = withTiming(1, { duration: 320 });
     } else if (activeTyping === 'you') {
       topFlex.value = withTiming(1, { duration: 320 });
-      bottomFlex.value = withTiming(3.5, { duration: 320 });
+      bottomFlex.value = withTiming(14, { duration: 320 });
     } else {
       topFlex.value = withTiming(1, { duration: 320 });
       bottomFlex.value = withTiming(1, { duration: 320 });
@@ -416,7 +416,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
   return (
     <SafeAreaView style={s.safe}>
       <KeyboardAvoidingView style={s.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Animated.View style={[s.half, s.rotated, topMotion]}>
+        <Animated.View style={[s.half, s.rotated, topMotion, activeTyping === 'you' && s.compressedContainer]}>
           {panel('partner')}
         </Animated.View>
 
@@ -456,7 +456,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
           </FtfMotion>
         </View>
 
-        <Animated.View style={[s.half, bottomMotion]}>
+        <Animated.View style={[s.half, bottomMotion, activeTyping === 'partner' && s.compressedContainer]}>
           {panel('you')}
         </Animated.View>
       </KeyboardAvoidingView>
@@ -541,6 +541,7 @@ const s = StyleSheet.create({
 
   /* Dynamic Area Expansion & In-App Keyboard Styles */
   compactBar: {
+    flex: 1,
     minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,5 +609,11 @@ const s = StyleSheet.create({
   partnerDraftText: {
     fontSize: 16,
     color: colors.ink,
+  },
+  compressedContainer: {
+    maxHeight: 52,
+    minHeight: 52,
+    overflow: 'hidden',
+    backgroundColor: '#F5F3FB',
   },
 });
