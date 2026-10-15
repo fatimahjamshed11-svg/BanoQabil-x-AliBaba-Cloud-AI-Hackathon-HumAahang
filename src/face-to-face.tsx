@@ -309,7 +309,6 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                 onChangeText={val => onDraft('partner', val)}
                 onSend={val => {
                   send('partner', val, true);
-                  setActiveTyping('none');
                 }}
                 onClose={() => setActiveTyping('none')}
                 defaultLanguage={language === 'اردو' ? 'ur' : 'en'}
@@ -383,7 +382,6 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                       disabled={voice.busy}
                       onPress={() => {
                         send(sender, drafts[sender], true);
-                        setActiveTyping('none');
                       }}
                     />
                   )}
