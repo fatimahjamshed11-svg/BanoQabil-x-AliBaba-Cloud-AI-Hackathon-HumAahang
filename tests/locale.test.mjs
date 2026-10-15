@@ -50,11 +50,11 @@ test('every saved language survives reopening and changes only the language', as
 test('failed language write keeps the saved language and can be explicitly retried', async () => {
   let raw = JSON.stringify(defaultProfile), fail = true;
   const repo = createProfileStorage({ getItem: async () => raw, setItem: async (_key, value) => { if (fail) throw new Error('Full disk'); raw = value; } });
-  await assert.rejects(repo.update({ language: 'اردو' }));
-  assert.equal((await repo.load()).language, 'English');
-  fail = false;
-  await repo.update({ language: 'اردو' });
+  await assert.rejects(repo.update({ language: 'Roman Urdu' }));
   assert.equal((await repo.load()).language, 'اردو');
+  fail = false;
+  await repo.update({ language: 'Roman Urdu' });
+  assert.equal((await repo.load()).language, 'Roman Urdu');
 });
 test('passport share localizes headings and default instructions but never authored details', () => {
   const custom = { ...defaultProfile, language: 'اردو', passport: { ...defaultProfile.passport, name: 'Home', instructions: 'Save', contactName: 'Settings', contactPhone: '+923001234567', showContact: true } };

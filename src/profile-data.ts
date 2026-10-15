@@ -35,7 +35,7 @@ export function emergencyCallTarget(kind: CallKind, profile: ProfileData): CallT
 }
 export const emptyPassport: PassportDetails = { name: '', instructions: '', contactName: '', contactPhone: '', showName: true, showContact: false };
 export const defaultProfile: ProfileData = {
-  onboarded: false, language: 'English', persona: 'deaf', passport: emptyPassport, emergency: emptyEmergencyNumbers,
+  onboarded: false, language: 'اردو', persona: 'deaf', passport: emptyPassport, emergency: emptyEmergencyNumbers,
   prefs: { largeText: false, highContrast: false, voiceGuidance: true, haptics: true, autoSpeak: true, gestures: true },
 };
 export const passportLanguages = languageChoices;
