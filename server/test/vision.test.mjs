@@ -106,18 +106,20 @@ test('PSL analysis compares the uploaded still with configured references in one
   const expected = { ...result('ur', 'gesture'), gesture: 'hello', uncertain: true,
     description: 'اس اشارے کا ممکنہ مطلب سلام ہے، مگر نتیجے کی تصدیق کریں۔',
     spokenDescription: 'اس اشارے کا ممکنہ مطلب سلام ہے، مگر نتیجے کی تصدیق کریں۔' };
-  let schema;
+  let schema, instructionsText;
   const analyze = createVisionAnalyzer({ openaiKey: 'private-test-key', pslSignCatalog: catalog, pslReferenceImages: [reference] }, async (_, options) => {
     const body = JSON.parse(options.body), content = body.input[0].content;
-    schema = body.text.format.schema;
-    assert.match(body.instructions, /Compare the captured photo with the reference photos and simplified symbols/);
-    assert.match(body.instructions, /Never expose catalog IDs, the reference set, or the comparison process/);
+    schema = body.text.format.schema; instructionsText = body.instructions;
     assert.ok(content.some(item => item.type === 'input_image' && item.image_url === `data:image/jpeg;base64,${reference.base64}`));
     assert.ok(content.some(item => item.type === 'input_image' && item.image_url === `data:image/jpeg;base64,${reference.symbolBase64}`));
     assert.ok(content.some(item => item.type === 'input_text' && item.text.includes('hello')));
     return providerResponse(expected);
   });
   assert.deepEqual(await analyze(input('ur', 'gesture')), expected);
+  assert.match(instructionsText, /Compare the captured photo with the reference photos and simplified symbols/);
+  assert.match(instructionsText, /lead with its concise conventional name/i);
+  assert.match(instructionsText, /Do not substitute a description of hand posture for its name/i);
+  assert.match(instructionsText, /Never expose catalog IDs, the reference set, or the comparison process/);
   assert.deepEqual(schema.properties.task.enum, ['gesture']);
   assert.deepEqual(schema.properties.gesture, { type: 'string', enum: ['hello', 'other', 'unknown'] });
   assert.equal(schema.properties.objects.maxItems, 0);
