@@ -1,16 +1,10 @@
 export const judgeAccessRows = `
-Welcome to Hum Ahang|ہم آہنگ میں خوش آمدید|Hum Ahang mein khush aamdeed
-Private judge preview|منصفین کے لیے خصوصی پیش نظارہ|Munsifeen ke liye khusoosi pesh nazara
-Preparing your demo…|آپ کی نمائش تیار ہو رہی ہے…|Aap ki numaish tayyar ho rahi hai…
-Your demo is ready|آپ کی نمائش تیار ہے|Aap ki numaish tayyar hai
-Continue your demo|اپنی نمائش جاری رکھیں|Apni numaish jaari rakhein
-Your existing connection has not been rechecked. Reopen the original private demo link if a feature asks to reconnect.|آپ کے موجودہ رابطے کی دوبارہ جانچ نہیں ہوئی۔ اگر کوئی سہولت دوبارہ رابطہ مانگے تو اصل خصوصی نمائش کا ربط دوبارہ کھولیں۔|Aap ke maujooda raabte ki dobara jaanch nahin hui. Agar koi sahulat dobara raabta maange to asal khusoosi numaish ka link dobara kholein.
-Demo connection needs attention|نمائش کے رابطے پر توجہ درکار ہے|Numaish ke raabte par tawajjuh darkar hai
-Speech and photo features are connected. Choose a feature to begin.|آواز اور تصویر کی سہولتیں منسلک ہیں۔ شروع کرنے کے لیے سہولت منتخب کریں۔|Aawaz aur tasveer ki sahulatein munsalik hain. Shuru karne ke liye sahulat muntakhib karein.
-Enter demo|نمائش شروع کریں|Numaish shuru karein
-Retry demo connection|نمائش کا رابطہ دوبارہ آزمائیں|Numaish ka raabta dobara aazmayen
-Explore without cloud features|آن لائن سہولتوں کے بغیر دیکھیں|Online sahulaton ke baghair dekhein
-No microphone or camera starts automatically. This temporary connection stays only in this open app. After a reload or expiry, reopen the original private demo link.|مائیک یا کیمرا خود بخود شروع نہیں ہوتا۔ یہ عارضی رابطہ صرف کھلی ہوئی ایپ میں رہتا ہے۔ صفحہ دوبارہ کھولنے یا مدت ختم ہونے پر اصل خصوصی نمائش کا ربط دوبارہ کھولیں۔|Mic ya camera khud bakhud shuru nahin hota. Yeh aarzi raabta sirf khuli hui app mein rehta hai. Safha dobara kholne ya muddat khatam hone par asal khusoosi numaish ka link dobara kholein.
+Opening Hum Ahang…|ہم آہنگ کھل رہی ہے…|Hum Ahang khul rahi hai…
+Couldn’t connect to online features|آن لائن سہولتوں سے رابطہ نہیں ہو سکا|Online sahulaton se raabta nahin ho saka
+Continue to the app|ایپ میں جائیں|App mein jaayein
+No camera or microphone starts automatically.|کیمرا یا مائیک خود بخود شروع نہیں ہوتا۔|Camera ya mic khud bakhud shuru nahin hota.
+Hum Ahang logo|ہم آہنگ کا لوگو|Hum Ahang ka logo
+Retry secure connection|محفوظ رابطہ دوبارہ آزمائیں|Mehfooz raabta dobara aazmayen
 Open the private demo link provided by the project team. No terminal or pairing code is needed.|منصوبے کی ٹیم کا دیا ہوا خصوصی نمائش کا ربط کھولیں۔ ٹرمینل یا رابطے کے کوڈ کی ضرورت نہیں۔|Mansoobe ki team ka diya hua khusoosi numaish ka link kholein. Terminal ya raabte ke code ki zaroorat nahin.
 This demo link is expired or incorrect. Ask the project team for an updated link.|نمائش کا یہ ربط غلط ہے یا اس کی مدت ختم ہو گئی ہے۔ منصوبے کی ٹیم سے نیا ربط مانگیں۔|Numaish ka yeh link ghalat hai ya is ki muddat khatam ho gayi hai. Mansoobe ki team se naya link maangein.
 Judge access is not available right now. Please contact the project team.|منصفین کی رسائی اس وقت دستیاب نہیں۔ منصوبے کی ٹیم سے رابطہ کریں۔|Munsifeen ki rasai is waqt dastiyab nahin. Mansoobe ki team se raabta karein.
