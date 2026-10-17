@@ -69,7 +69,7 @@ export function validateVisionTranslationResult(result, input) {
   return result;
 }
 
-const outputSchema = signIds => ({
+const outputSchema = (signIds, task = 'objects') => ({
   type: 'object', additionalProperties: false,
   required: ['task', 'description', 'spokenDescription', 'objects', 'gesture', 'uncertain'],
   properties: {
@@ -77,7 +77,7 @@ const outputSchema = signIds => ({
     description: { type: 'string' }, spokenDescription: { type: 'string' },
     objects: { type: 'array', items: { type: 'string' } },
     gesture: { type: ['string', 'null'], enum: [...signIds, ...fallbackGestures, null] },
-    uncertain: { type: 'boolean' },
+    uncertain: { type: 'boolean', enum: task === 'gesture' ? [true] : [true, false] },
   },
 });
 
@@ -117,7 +117,7 @@ export function createVisionAnalyzer(config, fetchImpl = fetch) {
             ...(input.task === 'gesture' ? [{ type: 'input_text', text: 'The next and final image is the user-captured photo to compare against the labeled references above.' }] : []),
             { type: 'input_image', image_url: `data:${input.image.mimeType};base64,${input.image.base64}`, detail: 'auto' },
           ] }],
-          text: { format: { type: 'json_schema', name: 'vision_observation', strict: true, schema: outputSchema(signIds) } },
+          text: { format: { type: 'json_schema', name: 'vision_observation', strict: true, schema: outputSchema(signIds, input.task) } },
         }),
       });
       if (!response.ok) {
