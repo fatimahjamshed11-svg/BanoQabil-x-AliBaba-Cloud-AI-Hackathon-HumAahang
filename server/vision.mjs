@@ -73,10 +73,13 @@ const outputSchema = (signIds, task = 'objects') => ({
   type: 'object', additionalProperties: false,
   required: ['task', 'description', 'spokenDescription', 'objects', 'gesture', 'uncertain'],
   properties: {
-    task: { type: 'string', enum: ['objects', 'gesture'] },
-    description: { type: 'string' }, spokenDescription: { type: 'string' },
-    objects: { type: 'array', items: { type: 'string' } },
-    gesture: { type: ['string', 'null'], enum: [...signIds, ...fallbackGestures, null] },
+    task: { type: 'string', enum: [task] },
+    description: { type: 'string', minLength: 1, maxLength: 1000 },
+    spokenDescription: { type: 'string', minLength: 1, maxLength: 1000 },
+    objects: { type: 'array', items: { type: 'string', minLength: 1, maxLength: 80 }, maxItems: task === 'gesture' ? 0 : 12 },
+    gesture: task === 'gesture'
+      ? { type: 'string', enum: [...signIds, ...fallbackGestures] }
+      : { type: ['string', 'null'], enum: [null] },
     uncertain: { type: 'boolean', enum: task === 'gesture' ? [true] : [true, false] },
   },
 });

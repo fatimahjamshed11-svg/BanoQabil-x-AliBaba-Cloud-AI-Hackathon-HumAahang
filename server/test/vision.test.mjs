@@ -84,6 +84,10 @@ test('Vision provider uses one bounded, non-stored Responses request and validat
       const body = JSON.parse(options.body);
       assert.equal(body.store, false); assert.equal(body.max_output_tokens, 1600);
       assert.equal(body.text.format.type, 'json_schema'); assert.equal(body.text.format.strict, true);
+      assert.deepEqual(body.text.format.schema.properties.task.enum, ['objects']);
+      assert.deepEqual(body.text.format.schema.properties.gesture, { type: ['string', 'null'], enum: [null] });
+      assert.equal(body.text.format.schema.properties.objects.maxItems, 12);
+      assert.equal(body.text.format.schema.properties.objects.items.maxLength, 80);
       assert.deepEqual(body.text.format.schema.properties.uncertain.enum, [true, false]);
       assert.match(body.input[0].content[1].image_url, /^data:image\/png;base64,/);
       const request = JSON.parse(body.input[0].content[0].text);
@@ -102,10 +106,10 @@ test('PSL analysis compares the uploaded still with configured references in one
   const expected = { ...result('ur', 'gesture'), gesture: 'hello', uncertain: true,
     description: 'اس اشارے کا ممکنہ مطلب سلام ہے، مگر نتیجے کی تصدیق کریں۔',
     spokenDescription: 'اس اشارے کا ممکنہ مطلب سلام ہے، مگر نتیجے کی تصدیق کریں۔' };
+  let schema;
   const analyze = createVisionAnalyzer({ openaiKey: 'private-test-key', pslSignCatalog: catalog, pslReferenceImages: [reference] }, async (_, options) => {
     const body = JSON.parse(options.body), content = body.input[0].content;
-    assert.equal(body.text.format.schema.properties.gesture.enum.join(','), 'hello,other,unknown,');
-    assert.deepEqual(body.text.format.schema.properties.uncertain.enum, [true]);
+    schema = body.text.format.schema;
     assert.match(body.instructions, /Compare the captured photo with the reference photos and simplified symbols/);
     assert.match(body.instructions, /Never expose catalog IDs, the reference set, or the comparison process/);
     assert.ok(content.some(item => item.type === 'input_image' && item.image_url === `data:image/jpeg;base64,${reference.base64}`));
@@ -114,6 +118,10 @@ test('PSL analysis compares the uploaded still with configured references in one
     return providerResponse(expected);
   });
   assert.deepEqual(await analyze(input('ur', 'gesture')), expected);
+  assert.deepEqual(schema.properties.task.enum, ['gesture']);
+  assert.deepEqual(schema.properties.gesture, { type: 'string', enum: ['hello', 'other', 'unknown'] });
+  assert.equal(schema.properties.objects.maxItems, 0);
+  assert.deepEqual(schema.properties.uncertain.enum, [true]);
   await assert.rejects(createVisionAnalyzer({ openaiKey: 'private-test-key', pslSignCatalog: catalog,
     pslReferenceImages: [reference] }, async () => providerResponse({ ...expected, gesture: 'unconfigured' }))(input('ur', 'gesture')), failsWith('vision_invalid'));
 });
