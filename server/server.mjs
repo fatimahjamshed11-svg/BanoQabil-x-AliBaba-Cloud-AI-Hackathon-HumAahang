@@ -109,7 +109,8 @@ export function createSpeechServer(config, dependencies = {}) {
         try {
           const result = await (isTranslation ? translateVision : analyzeVision)(input, controller.signal);
           controller.signal.throwIfAborted();
-          reply(res, 200, isTranslation ? validateVisionTranslationResult(result, input) : validateVisionResult(result, input));
+          reply(res, 200, isTranslation ? validateVisionTranslationResult(result, input) :
+            validateVisionResult(result, input, config.pslSignCatalog?.map(sign => sign.id) ?? []));
         } finally { res.removeListener('close', abort); visionRequests.delete(controller); }
         return;
       }

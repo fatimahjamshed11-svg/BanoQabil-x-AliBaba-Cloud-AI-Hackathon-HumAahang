@@ -7,6 +7,8 @@ COPY app.json tsconfig.json App.tsx index.ts ./
 COPY app ./app
 COPY src ./src
 COPY assets ./assets
+COPY PSL-Images ./PSL-Images
+COPY shared ./shared
 RUN npx expo export --platform web --output-dir dist
 
 FROM node:24-bookworm-slim AS runtime
@@ -15,6 +17,9 @@ WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY server/*.mjs ./
+COPY --from=web-build /build/PSL-Images /app/PSL-Images
+COPY --from=web-build /build/assets/psl-signs /app/assets/psl-signs
+COPY --from=web-build /build/shared /app/shared
 COPY --from=web-build /build/dist /app/dist
 USER node
 EXPOSE 8787

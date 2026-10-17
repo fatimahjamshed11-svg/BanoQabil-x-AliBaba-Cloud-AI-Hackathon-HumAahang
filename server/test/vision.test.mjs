@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { once } from 'node:events';
 import { createSpeechServer } from '../server.mjs';
 import { readConfig } from '../config.mjs';
+import { pslSignCatalog, validatePslSignCatalog, loadPslSignReferences } from '../psl-sign-catalog.mjs';
 import { createVisionAnalyzer, validateVisionInput, validateVisionResult, VisionError, MAX_IMAGE_BYTES, MAX_VISION_BODY_BYTES } from '../vision.mjs';
 
 const token = 'vision-test-private-demo-token-32-characters';
@@ -12,7 +13,7 @@ const result = (language = 'ur', task = 'objects') => ({ task,
   description: language === 'ur' ? 'میز پر ایک کپ نظر آ رہا ہے۔' : language === 'roman' ? 'Mez par aik cup nazar aa raha hai.' : 'A cup is visible on a table.',
   spokenDescription: language === 'en' ? 'A cup is visible on a table.' : 'میز پر ایک کپ نظر آ رہا ہے۔',
   objects: task === 'objects' ? (language === 'ur' ? ['کپ', 'میز'] : ['cup', 'table']) : [],
-  gesture: task === 'gesture' ? 'open_palm' : null, uncertain: false,
+  gesture: task === 'gesture' ? 'other' : null, uncertain: task === 'gesture',
 });
 const providerResponse = output => new Response(JSON.stringify({ status: 'completed', output: [{ type: 'message',
   content: [{ type: 'output_text', text: JSON.stringify(output) }] }] }), { headers: { 'Content-Type': 'application/json' } });
@@ -39,6 +40,19 @@ test('Vision configuration is optional and never exposes or needs keys in the fr
   assert.equal(readConfig({ ...env, OPENAI_VISION_MODEL: 'gpt-4.1-mini-2025-04-14' }).openaiVisionModel, 'gpt-4.1-mini-2025-04-14');
   assert.throws(() => readConfig({ ...env, OPENAI_API_KEY: 'replace_with_a_key' }), /OPENAI_API_KEY/);
   assert.throws(() => readConfig({ ...env, OPENAI_VISION_MODEL: 'https://other-provider.test' }), /OPENAI_VISION_MODEL/);
+});
+
+test('PSL catalog is bounded, validates its labels, and requires an image for every configured reference', () => {
+  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', visualCue: 'Open right hand, palm facing forward.' }];
+  assert.deepEqual(validatePslSignCatalog(catalog), catalog);
+  assert.throws(() => validatePslSignCatalog([...catalog, { ...catalog[0] }]), /Invalid PSL sign catalog/);
+  assert.throws(() => validatePslSignCatalog(Array.from({ length: 11 }, (_, i) => ({ ...catalog[0], id: `sign-${i}` }))), /at most 10/);
+  assert.throws(() => loadPslSignReferences(catalog), /Missing PSL reference image/);
+  const references = loadPslSignReferences(pslSignCatalog);
+  assert.equal(pslSignCatalog.length, 10);
+  assert.deepEqual(references.map(({ id }) => id), pslSignCatalog.map(({ id }) => id));
+  assert.ok(references.every(reference => reference.mimeType === 'image/jpeg' && reference.base64.length > 100));
+  assert.ok(references.every(reference => reference.symbolMimeType === 'image/jpeg' && reference.symbolBase64.length > 100));
 });
 
 test('Vision input validates size, canonical base64, allowed MIME signatures and strict request fields', () => {
@@ -71,12 +85,35 @@ test('Vision provider uses one bounded, non-stored Responses request and validat
       assert.equal(body.store, false); assert.equal(body.max_output_tokens, 1600);
       assert.equal(body.text.format.type, 'json_schema'); assert.equal(body.text.format.strict, true);
       assert.match(body.input[0].content[1].image_url, /^data:image\/png;base64,/);
-      assert.deepEqual(JSON.parse(body.input[0].content[0].text), { task: 'objects', language });
+      const request = JSON.parse(body.input[0].content[0].text);
+      assert.equal(request.task, 'objects'); assert.equal(request.language, language);
       assert.ok(!options.body.includes('private-test-key'));
       return providerResponse(result(language));
     });
     assert.deepEqual(await analyze(input(language)), result(language)); assert.equal(called, 1);
   }
+});
+
+test('PSL analysis compares the uploaded still with configured references in one call and validates catalog IDs', async () => {
+  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', visualCue: 'Open right hand, palm facing forward.' }];
+  const reference = { ...catalog[0], mimeType: 'image/jpeg', base64: Buffer.from('reference-image-placeholder').toString('base64'),
+    symbolMimeType: 'image/jpeg', symbolBase64: Buffer.from('symbol-image-placeholder').toString('base64') };
+  const expected = { ...result('ur', 'gesture'), gesture: 'hello', uncertain: true,
+    description: 'اس اشارے کا ممکنہ مطلب سلام ہے، مگر نتیجے کی تصدیق کریں۔',
+    spokenDescription: 'اس اشارے کا ممکنہ مطلب سلام ہے، مگر نتیجے کی تصدیق کریں۔' };
+  const analyze = createVisionAnalyzer({ openaiKey: 'private-test-key', pslSignCatalog: catalog, pslReferenceImages: [reference] }, async (_, options) => {
+    const body = JSON.parse(options.body), content = body.input[0].content;
+    assert.equal(body.text.format.schema.properties.gesture.enum.join(','), 'hello,other,unknown,');
+    assert.match(body.instructions, /Compare the captured photo with the reference photos and simplified symbols/);
+    assert.match(body.instructions, /Never expose catalog IDs, the reference set, or the comparison process/);
+    assert.ok(content.some(item => item.type === 'input_image' && item.image_url === `data:image/jpeg;base64,${reference.base64}`));
+    assert.ok(content.some(item => item.type === 'input_image' && item.image_url === `data:image/jpeg;base64,${reference.symbolBase64}`));
+    assert.ok(content.some(item => item.type === 'input_text' && item.text.includes('hello')));
+    return providerResponse(expected);
+  });
+  assert.deepEqual(await analyze(input('ur', 'gesture')), expected);
+  await assert.rejects(createVisionAnalyzer({ openaiKey: 'private-test-key', pslSignCatalog: catalog,
+    pslReferenceImages: [reference] }, async () => providerResponse({ ...expected, gesture: 'unconfigured' }))(input('ur', 'gesture')), failsWith('vision_invalid'));
 });
 
 test('Vision rejects incorrect scripts, extra fields, wrong tasks and non-enumerated gesture translations', () => {
@@ -92,7 +129,8 @@ test('Vision rejects incorrect scripts, extra fields, wrong tasks and non-enumer
   assert.throws(() => validateVisionResult({ ...result('roman'), spokenDescription: 'Aik cup hai.' }, input('roman')), failsWith('vision_invalid'));
   assert.deepEqual(validateVisionResult(result('ur', 'gesture'), input('ur', 'gesture')), result('ur', 'gesture'));
   assert.throws(() => validateVisionResult({ ...result('ur', 'gesture'), gesture: 'hello' }, input('ur', 'gesture')), failsWith('vision_invalid'));
-  assert.throws(() => validateVisionResult({ ...result('ur', 'gesture'), gesture: 'unknown' }, input('ur', 'gesture')), failsWith('vision_invalid'));
+  assert.throws(() => validateVisionResult({ ...result('ur', 'gesture'), gesture: 'hello' }, input('ur', 'gesture'), ['greet']), failsWith('vision_invalid'));
+  assert.throws(() => validateVisionResult({ ...result('ur', 'gesture'), gesture: 'unknown', uncertain: false }, input('ur', 'gesture')), failsWith('vision_invalid'));
   assert.equal(validateVisionResult({ ...result('ur', 'gesture'), gesture: 'unknown', uncertain: true }, input('ur', 'gesture')).uncertain, true);
 });
 
@@ -140,6 +178,17 @@ test('Vision route protects authorization, origin, upload length and type before
   assert.equal(calls, 0);
   const response = await f.post(); assert.equal(response.status, 200); assert.deepEqual(await response.json(), result());
   assert.equal(calls, 1);
+});
+
+test('Vision route accepts only configured PSL catalog IDs and keeps every result reviewable', async t => {
+  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', visualCue: 'Open right hand, palm facing forward.' }];
+  const expected = { ...result('ur', 'gesture'), gesture: 'hello', uncertain: true };
+  const f = await fixture(t, { analyzeVision: async () => expected }, { pslSignCatalog: catalog });
+  const response = await f.post(input('ur', 'gesture'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), expected);
+  const bad = await fixture(t, { analyzeVision: async () => ({ ...expected, gesture: 'not-in-catalog' }) }, { pslSignCatalog: catalog });
+  assert.equal((await bad.post(input('ur', 'gesture'))).status, 502);
 });
 
 test('Vision accepts paired grants and revocation/origin binding also applies to images', async t => {

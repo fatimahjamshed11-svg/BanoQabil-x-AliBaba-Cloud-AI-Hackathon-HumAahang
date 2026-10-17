@@ -66,11 +66,12 @@ test('English, Urdu and Roman Urdu use independently validated display and speec
   assert.equal(isVisionResult(results.en, 'objects', 'ur'), false);
 });
 
-test('static gesture results accept only the requested task and documented gesture set', () => {
-  for (const gesture of ['open_palm', 'closed_fist', 'thumbs_up', 'thumbs_down', 'victory', 'pointing_up', 'unknown']) {
-    assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture }, 'gesture', 'en'), true);
+test('PSL results accept catalog identifiers but require explicit uncertainty', () => {
+  for (const gesture of ['hello', 'please-help', 'namaste_1', 'other', 'unknown']) {
+    assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture, uncertain: true, objects: [] }, 'gesture', 'en'), true);
   }
-  assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture: 'sign_translation' }, 'gesture', 'en'), false);
+  assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture: 'unsafe id', uncertain: true, objects: [] }, 'gesture', 'en'), false);
+  assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture: 'hello', uncertain: false, objects: [] }, 'gesture', 'en'), false);
   assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture: 'open_palm' }, 'objects', 'en'), false);
   assert.equal(isVisionResult({ ...results.en, gesture: 'open_palm' }, 'objects', 'en'), false);
 });

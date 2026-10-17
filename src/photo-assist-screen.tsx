@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Image, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, Image, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Button } from './components';
 import { Ionicons, Pressable, SafeAreaView, Text, useLocale } from './localized-ui';
@@ -10,6 +10,7 @@ import { useApp } from './store';
 import { colors } from './theme';
 import { usePhotoAnalysis } from './use-photo-analysis';
 import type { VisionLanguage, VisionTask } from './vision-client';
+import { pslSigns } from './psl-signs';
 
 const resultLanguages: { code: VisionLanguage; label: string; name: string }[] = [
   { code: 'en', label: 'English', name: 'English' },
@@ -23,6 +24,7 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
   const { prefs } = useApp();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
+  const [selectedSignId, setSelectedSignId] = useState<string | null>(null);
   const [readAloud, setReadAloud] = useState(prefs.autoSpeak);
   const analysis = usePhotoAnalysis();
   const scroll = useRef<ScrollView>(null);
@@ -30,6 +32,7 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
   const translating = analysis.phase === 'translating';
   const speaking = analysis.playback.phase !== 'idle';
   const outputLanguage: VisionLanguage = language === 'English' ? 'en' : rtl ? 'ur' : 'roman';
+  const selectedSign = pslSigns.find(sign => sign.id === selectedSignId);
   const resultRTL = analysis.language === 'ur';
   const { cancel } = analysis;
   useFocusEffect(useCallback(() => () => setCameraOpen(false), []));
@@ -53,15 +56,15 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
     <View style={s.header}>
       <Pressable onPress={back} accessibilityLabel="Go back" style={s.iconButton}><Ionicons name="arrow-back" size={23} color={colors.ink}/></Pressable>
       <View style={s.headerCopy}><Text accessibilityRole="header" style={s.title}>{isGesture ? 'Sign Assistant' : 'AI Vision'}</Text>
-        <Text style={s.subtitle}>{isGesture ? 'Simple hand gestures · experimental' : 'Take a photo. Hear what is visible.'}</Text></View>
+        <Text style={s.subtitle}>{isGesture ? 'PSL sign check · experimental' : 'Take a photo. Hear what is visible.'}</Text></View>
     </View>
     <ScrollView ref={scroll} contentContainerStyle={s.content}>
-      {isGesture && <View style={s.notice}><Text style={s.noticeText}>Hand-pose practice only. This is not Pakistani Sign Language translation and cannot understand moving signs or sentences.</Text></View>}
+      {isGesture && <View style={s.notice}><Text style={s.noticeText}>Take one still photo for AI identification, or browse the ten signs below to see their meanings in English and Urdu.</Text></View>}
       <View style={[s.preview, photo && s.previewWithPhoto]}>
         {photo ? <Image source={{ uri: photo.uri }} resizeMode="contain" style={s.image} accessible accessibilityLabel={t('Your captured photo')}/> : <>
           <View style={s.cameraIcon}><Ionicons name={isGesture ? 'hand-left-outline' : 'camera-outline'} size={40} color={colors.primaryDark}/></View>
-          <Text style={s.emptyTitle}>{isGesture ? 'Keep one hand clearly in view' : 'What is in front of you?'}</Text>
-          <Text style={s.emptyText}>{isGesture ? 'Use good light and show your whole hand.' : 'Keep the photo clear and well lit.'}</Text>
+          <Text style={s.emptyTitle}>{isGesture ? 'Capture a PSL sign' : 'What is in front of you?'}</Text>
+          <Text style={s.emptyText}>{isGesture ? 'Use good light. Show the whole hand and orientation; include both hands if the sign needs them.' : 'Keep the photo clear and well lit.'}</Text>
         </>}
       </View>
       {!photo ? <Button label="Take a photo" icon="camera-outline" onPress={startCamera}/> : <>
@@ -74,7 +77,31 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
           <Pressable onPress={() => { cancel(); setPhoto(null); }} style={s.smallButton} accessibilityLabel="Clear photo"><Ionicons name="close" size={19} color={colors.muted}/><Text style={s.secondaryLink}>Clear photo</Text></Pressable>
         </View>
       </>}
-      {!analysis.result && <Pressable accessibilityRole="button" accessibilityLabel="Read results aloud" accessibilityState={{ selected: readAloud, disabled: busy }} disabled={busy} onPress={() => setReadAloud(value => !value)} style={s.readOption}>
+      {isGesture && <View style={s.library}>
+        <View style={s.libraryHeading}>
+          <View style={{ flex: 1 }}>
+            <Text accessibilityRole="header" style={s.libraryTitle}>Browse signs</Text>
+            <Text style={s.libraryHint}>Tap a symbol to see its meaning in both languages.</Text>
+          </View>
+          <View style={s.signCount}><Text style={s.signCountText}>10</Text></View>
+        </View>
+        <View style={s.signGrid}>
+          {pslSigns.map(sign => {
+            const selected = sign.id === selectedSignId;
+            return <Pressable key={sign.id} accessibilityRole="button"
+              accessibilityLabel={`${selected ? `${t('Selected sign')}. ` : ''}${sign.nameEn}, ${sign.nameUr}`}
+              accessibilityHint="Shows this sign's meaning in English and Urdu"
+              onPress={() => setSelectedSignId(sign.id)}
+              style={[s.signCard, selected && s.signCardSelected]}>
+              <View style={s.symbolFrame}><Image source={sign.symbol} resizeMode="contain" accessible={false} style={s.symbolImage}/></View>
+              <Text verbatim numberOfLines={1} style={s.signNameEn}>{sign.nameEn}</Text>
+              <Text verbatim numberOfLines={1} style={s.signNameUr}>{sign.nameUr}</Text>
+              {selected && <View style={s.selectedMark}><Ionicons name="checkmark" size={13} color={colors.surface}/></View>}
+            </Pressable>;
+          })}
+        </View>
+      </View>}
+      {!analysis.result && !isGesture && <Pressable accessibilityRole="button" accessibilityLabel="Read results aloud" accessibilityState={{ selected: readAloud, disabled: busy }} disabled={busy} onPress={() => setReadAloud(value => !value)} style={s.readOption}>
         <Ionicons name={readAloud ? 'volume-high-outline' : 'volume-mute-outline'} size={22} color={colors.primaryDark}/><Text style={s.readText}>Read results aloud</Text>
         <View accessible={false} style={[s.switch, readAloud && s.switchOn]}><View style={[s.switchDot, readAloud && s.switchDotOn]}/></View>
       </Pressable>}
@@ -82,7 +109,7 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
         {analysis.needsConnection && <Button label="Open Speech setup" variant="secondary" icon="settings-outline" onPress={() => router.push('/speech-setup')}/>}
       </View>}
       {analysis.result && <View style={s.result} onLayout={({ nativeEvent }) => scroll.current?.scrollTo({ y: nativeEvent.layout.y, animated: false })}>
-        <View style={s.resultHeading}><Ionicons name={analysis.result.uncertain ? 'help-circle-outline' : 'checkmark-circle-outline'} size={23} color={colors.primaryDark}/><Text accessibilityRole="header" style={s.resultTitle}>{analysis.result.uncertain ? 'Please check this result' : 'Photo result'}</Text></View>
+        <View style={s.resultHeading}><Ionicons name={analysis.result.uncertain ? 'help-circle-outline' : 'checkmark-circle-outline'} size={23} color={colors.primaryDark}/><Text accessibilityRole="header" style={s.resultTitle}>{isGesture ? 'Possible sign meaning' : analysis.result.uncertain ? 'Please check this result' : 'Photo result'}</Text></View>
         {!isGesture && <View style={s.languageControl}>
           <Text style={s.languageLabel}>Result language</Text>
           <View {...(Platform.OS === 'web' ? { dir: 'ltr' } : {})} style={[s.languages, Platform.OS !== 'web' && { direction: 'ltr' }]}>{resultLanguages.map(option => {
@@ -106,10 +133,27 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
         {!!analysis.playback.error && <Text style={s.errorText} accessibilityLiveRegion="polite">{analysis.playback.error}</Text>}
         {!isGesture && <Text style={s.privacy}>Changing language sends only the result text to OpenAI, not your photo again.</Text>}
       </View>}
-      {isGesture && <View style={s.supported}><Text style={s.resultTitle}>Supported hand poses</Text><Text style={s.emptyText}>Open palm, closed fist, thumbs-up, thumbs-down, victory, and pointing up. Other poses may be unknown.</Text></View>}
+      {isGesture && <View style={s.supported}><Text style={s.emptyText}>Camera identification is experimental and may be wrong. A still photo cannot capture movement or context, and this is not a substitute for a qualified interpreter.</Text></View>}
       <Text style={s.privacy}>Analyze sends this photo to OpenAI. Hum Ahang does not store the upload on its server. Camera photos may remain in temporary device cache.</Text>
       <View style={s.caution}><Ionicons name="information-circle-outline" size={18} color="#665025"/><Text style={s.cautionText}>AI can miss objects or make mistakes. Do not use this for road crossing, medical decisions, or confirming safety.</Text></View>
     </ScrollView>
+    {isGesture && <Modal visible={!!selectedSign} transparent animationType="fade" onRequestClose={() => setSelectedSignId(null)}>
+      <View style={s.modalOverlay}>
+        <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={() => setSelectedSignId(null)}/>
+        {selectedSign && <View style={s.signMeaning} accessibilityViewIsModal accessibilityLiveRegion="polite">
+          <Image source={selectedSign.symbol} resizeMode="contain" accessible={false} style={s.meaningImage}/>
+          <View style={s.meaningCopy}>
+            <Text style={s.meaningLabel}>English meaning</Text>
+            <Text verbatim accessibilityRole="header" style={s.meaningEnglish}>{selectedSign.nameEn}</Text>
+            <Text style={s.meaningLabel}>اردو معنی</Text>
+            <Text verbatim style={s.meaningUrdu}>{selectedSign.nameUr}</Text>
+          </View>
+          <Pressable onPress={() => setSelectedSignId(null)} accessibilityLabel="Close sign meaning" style={s.closeMeaning}>
+            <Ionicons name="close" size={20} color={colors.muted}/>
+          </Pressable>
+        </View>}
+      </View>
+    </Modal>}
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
@@ -140,4 +184,14 @@ const s = StyleSheet.create({
   objects: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, object: { backgroundColor: colors.primaryLight, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }, objectText: { fontSize: 14, color: colors.primaryDark },
   privacy: { fontSize: 12, lineHeight: 19, color: '#615E70' }, caution: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 12, backgroundColor: colors.yellow }, cautionText: { flex: 1, fontSize: 12, lineHeight: 19, color: '#665025' },
   notice: { padding: 14, borderRadius: 14, backgroundColor: colors.primaryLight }, noticeText: { color: '#493781', fontSize: 13, lineHeight: 21 }, supported: { gap: 8, padding: 16, alignItems: 'center' },
+  library: { gap: 12, paddingTop: 8 }, libraryHeading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  libraryTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' }, libraryHint: { color: '#615E70', fontSize: 13, lineHeight: 20, marginTop: 3 },
+  signCount: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }, signCountText: { color: colors.primaryDark, fontSize: 15, fontWeight: '800' },
+  signGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  signCard: { width: '48.5%', minHeight: 148, padding: 10, borderWidth: 1, borderColor: '#E4DFF0', borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden' },
+  signCardSelected: { borderColor: colors.primary, borderWidth: 2, backgroundColor: '#F6F2FF' }, symbolFrame: { width: '100%', height: 88, borderRadius: 12, backgroundColor: '#F7F5FC', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  symbolImage: { width: '100%', height: '100%' }, signNameEn: { color: colors.ink, fontSize: 14, fontWeight: '700', maxWidth: '100%', textAlign: 'center' }, signNameUr: { color: colors.primaryDark, fontSize: 15, fontWeight: '700', maxWidth: '100%', textAlign: 'center' },
+  selectedMark: { position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primaryDark, alignItems: 'center', justifyContent: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: '#1A173399', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  signMeaning: { width: '100%', maxWidth: 460, minHeight: 156, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 22, borderWidth: 1, borderColor: '#D9CCFF', backgroundColor: colors.surface, elevation: 12 }, meaningImage: { width: 112, height: 112, borderRadius: 14, backgroundColor: '#F7F5FC' }, meaningCopy: { flex: 1, gap: 3 }, meaningLabel: { color: '#615E70', fontSize: 12, fontWeight: '600', marginTop: 2 }, meaningEnglish: { color: colors.ink, fontSize: 18, fontWeight: '800' }, meaningUrdu: { color: colors.primaryDark, fontSize: 20, fontWeight: '800', writingDirection: 'rtl' }, closeMeaning: { alignSelf: 'flex-start', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

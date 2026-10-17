@@ -31,7 +31,7 @@ export function usePhotoAnalysis() {
     analyze: useCallback(async (photo: VisionPhoto, language: VisionLanguage, task: VisionTask, autoSpeak: boolean) => {
       player.current?.stop();
       const result = await client.current?.analyze(photo, language, task);
-      if (result && client.current?.getState().result === result && autoSpeak) void player.current?.speak(result.description, result.spokenDescription);
+      if (result && client.current?.getState().result === result && autoSpeak && task === 'objects') void player.current?.speak(result.description, result.spokenDescription);
     }, []),
     translate: useCallback(async (language: VisionLanguage, autoSpeak: boolean) => {
       player.current?.stop();

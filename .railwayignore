@@ -16,6 +16,12 @@
 !src/**
 !assets/
 !assets/**
+!PSL-Images/
+!PSL-Images/**
+!shared/
+!shared/**
+PSL-Images/Symbols/
+PSL-Images/Symbols/**
 !server/
 !server/package.json
 !server/package-lock.json

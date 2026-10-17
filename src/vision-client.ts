@@ -34,7 +34,7 @@ export function isVisionResult(value: unknown, task: VisionTask, language: Visio
     safeText(result.spokenDescription, 1800) && scriptMatches(result.spokenDescription, language === 'en' ? 'en' : 'ur') &&
     Array.isArray(result.objects) && result.objects.length <= 20 && result.objects.every(item => safeText(item, 100) && scriptMatches(item, language)) &&
     typeof result.uncertain === 'boolean' && (task === 'objects' ? result.gesture === null :
-      typeof result.gesture === 'string' && ['open_palm', 'closed_fist', 'thumbs_up', 'thumbs_down', 'victory', 'pointing_up', 'unknown'].includes(result.gesture));
+      typeof result.gesture === 'string' && /^[a-z0-9_-]{1,40}$/u.test(result.gesture) && result.uncertain && result.objects.length === 0);
 }
 
 export function createVisionClient(options: { baseUrl: string; credentials: { current: CaptionCredential | null }; fetcher?: typeof fetch;

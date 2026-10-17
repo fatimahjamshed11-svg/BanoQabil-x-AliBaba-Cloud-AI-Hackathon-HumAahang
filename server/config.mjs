@@ -1,3 +1,5 @@
+import { pslSignCatalog, validatePslSignCatalog } from './psl-sign-catalog.mjs';
+
 export function requireHttpsOrigin(value, name) {
   try {
     const url = new URL(value);
@@ -41,6 +43,7 @@ export function readConfig(env = process.env) {
   }
   const openaiVisionModel = env.OPENAI_VISION_MODEL ?? 'gpt-4.1-mini';
   if (!/^[a-z0-9.-]{1,80}$/u.test(openaiVisionModel)) throw new Error('Invalid OPENAI_VISION_MODEL.');
+  validatePslSignCatalog();
   // This adapter uses server VAD and the singular language field. Models with
   // different session contracts must not be selected by an unchecked env value.
   const openaiSttModel = env.OPENAI_STT_MODEL ?? 'gpt-4o-transcribe';
@@ -65,7 +68,7 @@ export function readConfig(env = process.env) {
     publicUrl: publicEndpoint?.origin, publicHost: publicEndpoint?.host, webRoot: isPublic ? env.WEB_ROOT || undefined : undefined,
     clientToken: env.STT_CLIENT_TOKEN, sttProvider, openaiSttModel, deepgramKey: env.DEEPGRAM_API_KEY,
     deepseekKey: env.DEEPSEEK_API_KEY, deepseekModel, conversionTimeoutMs: 12000,
-    openaiKey, openaiVisionModel, visionTimeoutMs: 25000, judgeAccessKey, judgeAccessExpiresAt };
+    openaiKey, openaiVisionModel, pslSignCatalog, visionTimeoutMs: 25000, judgeAccessKey, judgeAccessExpiresAt };
 }
 
 export function validateAudio(body) {
