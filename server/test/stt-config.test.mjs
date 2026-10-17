@@ -9,16 +9,18 @@ test('OpenAI is the default speech provider and shares only the server key with 
   assert.equal(config.sttProvider, 'openai');
   assert.equal(config.openaiSttModel, 'gpt-4o-transcribe');
   assert.equal(config.openaiVisionModel, 'gpt-4.1-mini');
+  assert.equal(config.openaiCaptionModel, 'gpt-4.1-mini');
   assert.equal(config.deepgramKey, undefined);
   assert.equal(config.openaiKey, env.OPENAI_API_KEY);
   assert.equal(readConfig({ ...env, OPENAI_STT_MODEL: 'gpt-4o-mini-transcribe' }).openaiSttModel, 'gpt-4o-mini-transcribe');
 });
 
-test('Deepgram rollback is explicit and does not require an OpenAI key', () => {
-  const config = readConfig({ ...env, OPENAI_API_KEY: '', STT_PROVIDER: 'deepgram', DEEPGRAM_API_KEY: 'd'.repeat(32) });
+test('Deepgram recognition rollback still requires OpenAI for caption translation', () => {
+  const config = readConfig({ ...env, STT_PROVIDER: 'deepgram', DEEPGRAM_API_KEY: 'd'.repeat(32) });
   assert.equal(config.sttProvider, 'deepgram');
-  assert.equal(config.openaiKey, undefined);
+  assert.equal(config.openaiKey, env.OPENAI_API_KEY);
   assert.equal(config.deepgramKey, 'd'.repeat(32));
+  assert.throws(() => readConfig({ ...env, OPENAI_API_KEY: '', STT_PROVIDER: 'deepgram', DEEPGRAM_API_KEY: 'd'.repeat(32) }), /OPENAI_API_KEY/);
   assert.throws(() => readConfig({ ...env, STT_PROVIDER: 'deepgram' }), /DEEPGRAM_API_KEY/);
 });
 

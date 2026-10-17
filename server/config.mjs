@@ -11,7 +11,7 @@ export function requireHttpsOrigin(value, name) {
 export function readConfig(env = process.env) {
   const sttProvider = env.STT_PROVIDER ?? 'openai';
   if (!['openai', 'deepgram'].includes(sttProvider)) throw new Error('STT_PROVIDER must be openai or deepgram.');
-  for (const name of [sttProvider === 'openai' ? 'OPENAI_API_KEY' : 'DEEPGRAM_API_KEY', 'DEEPSEEK_API_KEY', 'STT_CLIENT_TOKEN']) {
+  for (const name of new Set(['OPENAI_API_KEY', sttProvider === 'openai' ? 'OPENAI_API_KEY' : 'DEEPGRAM_API_KEY', 'DEEPSEEK_API_KEY', 'STT_CLIENT_TOKEN'])) {
     const value = env[name];
     if (!value || value.length < 20 || value.length > 512 || /\s/u.test(value) || /replace|your[_-]|example/i.test(value)) {
       throw new Error(`Set ${name} in server/.env (never in EXPO_PUBLIC_*).`);
@@ -43,6 +43,8 @@ export function readConfig(env = process.env) {
   }
   const openaiVisionModel = env.OPENAI_VISION_MODEL ?? 'gpt-4.1-mini';
   if (!/^[a-z0-9.-]{1,80}$/u.test(openaiVisionModel)) throw new Error('Invalid OPENAI_VISION_MODEL.');
+  const openaiCaptionModel = env.OPENAI_CAPTION_MODEL ?? 'gpt-4.1-mini';
+  if (!/^[a-z0-9.-]{1,80}$/u.test(openaiCaptionModel)) throw new Error('Invalid OPENAI_CAPTION_MODEL.');
   validatePslSignCatalog();
   // This adapter uses server VAD and the singular language field. Models with
   // different session contracts must not be selected by an unchecked env value.
@@ -68,7 +70,7 @@ export function readConfig(env = process.env) {
     publicUrl: publicEndpoint?.origin, publicHost: publicEndpoint?.host, webRoot: isPublic ? env.WEB_ROOT || undefined : undefined,
     clientToken: env.STT_CLIENT_TOKEN, sttProvider, openaiSttModel, deepgramKey: env.DEEPGRAM_API_KEY,
     deepseekKey: env.DEEPSEEK_API_KEY, deepseekModel, conversionTimeoutMs: 12000,
-    openaiKey, openaiVisionModel, pslSignCatalog, visionTimeoutMs: 25000, judgeAccessKey, judgeAccessExpiresAt };
+    openaiKey, openaiCaptionModel, openaiVisionModel, pslSignCatalog, visionTimeoutMs: 25000, judgeAccessKey, judgeAccessExpiresAt };
 }
 
 export function validateAudio(body) {

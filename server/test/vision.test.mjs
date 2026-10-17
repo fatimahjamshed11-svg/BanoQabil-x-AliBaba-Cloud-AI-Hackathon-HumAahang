@@ -34,8 +34,8 @@ async function fixture(t, dependencies = {}, config = {}) {
 }
 
 test('Vision configuration is optional and never exposes or needs keys in the frontend', () => {
-  const env = { STT_PROVIDER: 'deepgram', DEEPGRAM_API_KEY: 'a'.repeat(32), DEEPSEEK_API_KEY: 'b'.repeat(32), STT_CLIENT_TOKEN: token };
-  assert.equal(readConfig(env).openaiKey, undefined);
+  const env = { STT_PROVIDER: 'deepgram', DEEPGRAM_API_KEY: 'a'.repeat(32), OPENAI_API_KEY: 'o'.repeat(32), DEEPSEEK_API_KEY: 'b'.repeat(32), STT_CLIENT_TOKEN: token };
+  assert.equal(readConfig(env).openaiKey, 'o'.repeat(32));
   assert.equal(readConfig(env).openaiVisionModel, 'gpt-4.1-mini');
   assert.equal(readConfig({ ...env, OPENAI_VISION_MODEL: 'gpt-4.1-mini-2025-04-14' }).openaiVisionModel, 'gpt-4.1-mini-2025-04-14');
   assert.throws(() => readConfig({ ...env, OPENAI_API_KEY: 'replace_with_a_key' }), /OPENAI_API_KEY/);

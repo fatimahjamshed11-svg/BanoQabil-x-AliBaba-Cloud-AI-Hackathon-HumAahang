@@ -141,7 +141,7 @@ test('OpenAI startup and runtime errors retain the existing safe messages and co
   }
 });
 
-test('a failed DeepSeek conversion after OpenAI recognition preserves the completed bilingual pair', { timeout: 5000 }, async t => {
+test('a failed OpenAI translation after recognition preserves the completed bilingual pair', { timeout: 5000 }, async t => {
   const flow = await createFlow(t, { translate: input => input.text === source ? responseFor(source)
     : new Response('PRIVATE_TRANSLATION_DIAGNOSTIC', { status: 503 }) });
   await flow.client.connect(flow.server.newPairingCode());
@@ -179,12 +179,12 @@ async function createFlow(t, { sampleRate = 16000, translate = input => response
   });
   const config = { clientToken: operatorToken, origins: [origin], sttProvider: 'openai',
     openaiKey: providerSecret, openaiSttModel: 'gpt-4o-transcribe',
-    deepseekKey: 'isolated-deepseek-secret-never-for-client', deepseekModel: 'deepseek-v4-flash',
+    openaiCaptionModel: 'gpt-4.1-mini',
     connectTimeoutMs: 2000, drainTimeoutMs: 3000 };
   const processBilingual = createBilingualProcessor(config, async (url, options) => {
-    assert.equal(url, 'https://api.deepseek.com/chat/completions');
+    assert.equal(url, 'https://api.openai.com/v1/chat/completions');
     const body = JSON.parse(options.body);
-    assert.equal(body.model, config.deepseekModel);
+    assert.equal(body.model, config.openaiCaptionModel);
     const input = JSON.parse(body.messages[1].content);
     conversions.push(input);
     return translate(input);

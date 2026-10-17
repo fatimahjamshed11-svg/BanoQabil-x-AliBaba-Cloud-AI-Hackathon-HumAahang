@@ -51,21 +51,23 @@ test('conversion times out and aborted callers do not make requests', async () =
   await assert.rejects(createConverter({}, () => { assert.fail('no request'); })({ text: 'पानी', spans: ['पानी'] }, controller.signal));
 });
 
-test('bilingual processor sends every stable English segment once and derives both outputs from source', async () => {
+test('bilingual processor uses the configured OpenAI caption model and sends each segment once', async () => {
   const requests = [];
-  const process = createBilingualProcessor({ deepseekKey: 'private-key', deepseekModel: 'deepseek-v4-flash' }, async (url, options) => {
+  const process = createBilingualProcessor({ openaiKey: 'private-key', openaiCaptionModel: 'gpt-4.1-mini' }, async (url, options) => {
     requests.push({ url, options });
     return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ ur: 'مجھے پانی چاہیے۔', en: 'I need water.' }) } }] });
   });
   assert.deepEqual(await process({ text: 'I need water.', languages: ['en'] }), { ur: 'مجھے پانی چاہیے۔', en: 'I need water.' });
   assert.equal(requests.length, 1);
-  assert.equal(requests[0].url, 'https://api.deepseek.com/chat/completions');
+  assert.equal(requests[0].url, 'https://api.openai.com/v1/chat/completions');
+  assert.equal(requests[0].options.headers.Authorization, 'Bearer private-key');
   assert.equal(requests[0].options.redirect, 'error');
   const request = JSON.parse(requests[0].options.body);
+  assert.equal(request.model, 'gpt-4.1-mini');
+  assert.equal(request.store, false);
   assert.deepEqual(JSON.parse(request.messages[1].content), { text: 'I need water.', languages: ['en'] });
   assert.equal(request.response_format.type, 'json_object');
-  assert.equal(request.thinking.type, 'disabled');
-  assert.ok(request.max_tokens <= 4096);
+  assert.ok(request.max_completion_tokens <= 4096);
 });
 
 test('bilingual provider rejects raw Hindi, dropped numbers and extra metadata atomically', async () => {

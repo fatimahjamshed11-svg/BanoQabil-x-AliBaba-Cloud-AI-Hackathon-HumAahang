@@ -31,9 +31,9 @@ test('real caption client pairs, streams synthetic PCM and receives one bilingua
       }
     });
   });
-  const processBilingual = createBilingualProcessor({ deepseekKey: 'fake-test-key', deepseekModel: 'deepseek-v4-flash' }, async (url, options) => {
+  const processBilingual = createBilingualProcessor({ openaiKey: 'fake-test-key', openaiCaptionModel: 'gpt-4.1-mini' }, async (url, options) => {
     // This is the sole external-provider boundary double: no network request is made.
-    assert.equal(url, 'https://api.deepseek.com/chat/completions');
+    assert.equal(url, 'https://api.openai.com/v1/chat/completions');
     conversionInputs.push(JSON.parse(JSON.parse(options.body).messages[1].content));
     return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(outputs) } }] });
   });
