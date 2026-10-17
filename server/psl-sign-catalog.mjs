@@ -8,12 +8,13 @@ export function validatePslSignCatalog(catalog = pslSignCatalog) {
   if (!Array.isArray(catalog) || catalog.length > 10) throw new Error('PSL sign catalog must contain at most 10 signs.');
   const ids = new Set();
   for (const sign of catalog) {
-    if (!sign || Object.keys(sign).sort().join(',') !== 'id,nameEn,nameUr,visualCue' ||
+    if (!sign || Object.keys(sign).sort().join(',') !== 'id,nameEn,nameRoman,nameUr,visualCue' ||
         !/^[a-z0-9_-]{1,40}$/u.test(sign.id) || ids.has(sign.id) ||
         typeof sign.nameEn !== 'string' || !sign.nameEn.trim() || sign.nameEn.length > 80 ||
         typeof sign.nameUr !== 'string' || !sign.nameUr.trim() || sign.nameUr.length > 80 ||
+        typeof sign.nameRoman !== 'string' || !sign.nameRoman.trim() || sign.nameRoman.length > 80 ||
         typeof sign.visualCue !== 'string' || !sign.visualCue.trim() || sign.visualCue.length > 240 ||
-        /[\p{Cc}\p{Cf}]/u.test(`${sign.nameEn}${sign.nameUr}${sign.visualCue}`)) {
+        /[\p{Cc}\p{Cf}]/u.test(`${sign.nameEn}${sign.nameUr}${sign.nameRoman}${sign.visualCue}`)) {
       throw new Error('Invalid PSL sign catalog entry.');
     }
     ids.add(sign.id);

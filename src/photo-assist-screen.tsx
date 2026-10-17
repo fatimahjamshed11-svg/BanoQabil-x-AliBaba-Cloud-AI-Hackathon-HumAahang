@@ -9,7 +9,7 @@ import { RecordingStatus } from './recording-status';
 import { useApp } from './store';
 import { colors } from './theme';
 import { usePhotoAnalysis } from './use-photo-analysis';
-import type { VisionLanguage, VisionTask } from './vision-client';
+import { getPslResultPresentation, type VisionLanguage, type VisionTask } from './vision-client';
 import { pslSigns } from './psl-signs';
 
 const resultLanguages: { code: VisionLanguage; label: string; name: string }[] = [
@@ -34,6 +34,7 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
   const outputLanguage: VisionLanguage = language === 'English' ? 'en' : rtl ? 'ur' : 'roman';
   const selectedSign = pslSigns.find(sign => sign.id === selectedSignId);
   const resultRTL = analysis.language === 'ur';
+  const resultPresentation = analysis.result ? getPslResultPresentation(analysis.result, analysis.language ?? outputLanguage) : null;
   const { cancel } = analysis;
   useFocusEffect(useCallback(() => () => setCameraOpen(false), []));
   useEffect(() => {
@@ -127,7 +128,7 @@ export function PhotoAssistScreen({ task }: { task: VisionTask }) {
             <Pressable onPress={analysis.cancelTranslation} accessibilityLabel="Cancel translation" style={s.smallButton}><Text style={s.link}>Cancel</Text></Pressable>
           </View>}
         </View>}
-        <Text verbatim selectable accessibilityLiveRegion={readAloud ? 'none' : 'polite'} style={[s.description, resultRTL ? s.urdu : s.ltrText]}>{analysis.result.description}</Text>
+        <Text verbatim selectable accessibilityLiveRegion={readAloud ? 'none' : 'polite'} style={[s.description, resultRTL ? s.urdu : s.ltrText, isGesture && resultPresentation?.matchedCatalog && s.signResultText]}>{isGesture ? resultPresentation?.displayText ?? analysis.result.description : analysis.result.description}</Text>
         {analysis.result.objects.length > 0 && <View {...(Platform.OS === 'web' ? { dir: resultRTL ? 'rtl' : 'ltr' } : {})} style={[s.objects, Platform.OS !== 'web' && { direction: resultRTL ? 'rtl' : 'ltr' }]}>{analysis.result.objects.map((object, index) => <View style={s.object} key={`${index}-${object}`}><Text verbatim style={[s.objectText, resultRTL ? s.rtlText : s.ltrText]}>{object}</Text></View>)}</View>}
         {speaking ? <RecordingStatus active={analysis.playback.phase === 'speaking'} title={analysis.playback.phase === 'preparing' ? 'Preparing voice' : 'Speaking'} detail="Device voice" action="stop" accessibilityLabel="Stop speaking" onAction={analysis.stopSpeaking}/> : !translating && <Button label="Speak again" icon="volume-high-outline" variant="secondary" onPress={analysis.speak}/>}
         {!!analysis.playback.error && <Text style={s.errorText} accessibilityLiveRegion="polite">{analysis.playback.error}</Text>}
@@ -175,7 +176,7 @@ const s = StyleSheet.create({
   switchDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface, alignSelf: 'flex-start' }, switchDotOn: { alignSelf: 'flex-end' },
   error: { backgroundColor: colors.redSoft, borderRadius: 16, padding: 16, gap: 12 }, errorText: { color: '#842334', fontSize: 14, lineHeight: 22 },
   result: { backgroundColor: colors.surface, borderWidth: 1, borderColor: '#E4DFF0', borderRadius: 20, padding: 16, gap: 16 }, resultHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  resultTitle: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: colors.ink }, description: { fontSize: 20, lineHeight: 30, color: colors.ink }, urdu: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 34 },
+  resultTitle: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: colors.ink }, description: { fontSize: 20, lineHeight: 30, color: colors.ink }, signResultText: { fontSize: 28, fontWeight: '800', textAlign: 'center' }, urdu: { writingDirection: 'rtl', textAlign: 'right', lineHeight: 34 },
   languageControl: { gap: 8 }, languageLabel: { fontSize: 12, fontWeight: '600', color: '#615E70' },
   languages: { flexDirection: 'row', gap: 4, padding: 4, backgroundColor: colors.cream, borderRadius: 14 },
   languageButton: { flex: 1, minHeight: 48, paddingHorizontal: 6, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1, borderColor: 'transparent', borderRadius: 10 },

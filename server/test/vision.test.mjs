@@ -43,7 +43,7 @@ test('Vision configuration is optional and never exposes or needs keys in the fr
 });
 
 test('PSL catalog is bounded, validates its labels, and requires an image for every configured reference', () => {
-  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', visualCue: 'Open right hand, palm facing forward.' }];
+  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', nameRoman: 'Salam', visualCue: 'Open right hand, palm facing forward.' }];
   assert.deepEqual(validatePslSignCatalog(catalog), catalog);
   assert.throws(() => validatePslSignCatalog([...catalog, { ...catalog[0] }]), /Invalid PSL sign catalog/);
   assert.throws(() => validatePslSignCatalog(Array.from({ length: 11 }, (_, i) => ({ ...catalog[0], id: `sign-${i}` }))), /at most 10/);
@@ -100,7 +100,7 @@ test('Vision provider uses one bounded, non-stored Responses request and validat
 });
 
 test('PSL analysis compares the uploaded still with configured references in one call and validates catalog IDs', async () => {
-  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', visualCue: 'Open right hand, palm facing forward.' }];
+  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', nameRoman: 'Salam', visualCue: 'Open right hand, palm facing forward.' }];
   const reference = { ...catalog[0], mimeType: 'image/jpeg', base64: Buffer.from('reference-image-placeholder').toString('base64'),
     symbolMimeType: 'image/jpeg', symbolBase64: Buffer.from('symbol-image-placeholder').toString('base64') };
   const expected = { ...result('ur', 'gesture'), gesture: 'hello', uncertain: true,
@@ -193,7 +193,7 @@ test('Vision route protects authorization, origin, upload length and type before
 });
 
 test('Vision route accepts only configured PSL catalog IDs and keeps every result reviewable', async t => {
-  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', visualCue: 'Open right hand, palm facing forward.' }];
+  const catalog = [{ id: 'hello', nameEn: 'Hello', nameUr: 'سلام', nameRoman: 'Salam', visualCue: 'Open right hand, palm facing forward.' }];
   const expected = { ...result('ur', 'gesture'), gesture: 'hello', uncertain: true };
   const f = await fixture(t, { analyzeVision: async () => expected }, { pslSignCatalog: catalog });
   const response = await f.post(input('ur', 'gesture'));

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createVisionClient, idleVision, isVisionResult, visionMessages } from '../src/vision-client.ts';
+import * as visionModule from '../src/vision-client.ts';
 
 const photo = { base64: 'aW1hZ2U=', mimeType: 'image/jpeg', uri: 'file:///private/cache/photo.jpg' };
 const results = {
@@ -74,6 +75,18 @@ test('PSL results accept catalog identifiers but require explicit uncertainty', 
   assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture: 'hello', uncertain: false, objects: [] }, 'gesture', 'en'), false);
   assert.equal(isVisionResult({ ...results.en, task: 'gesture', gesture: 'open_palm' }, 'objects', 'en'), false);
   assert.equal(isVisionResult({ ...results.en, gesture: 'open_palm' }, 'objects', 'en'), false);
+});
+
+test('PSL catalog matches present and speak the saved sign meaning instead of photo-description text', () => {
+  const match = { task: 'gesture', description: 'A person is raising a thumb.', spokenDescription: 'ایک شخص انگوٹھا اوپر کر رہا ہے۔',
+    objects: [], gesture: 'best', uncertain: true };
+  assert.deepEqual(visionModule.getPslResultPresentation(match, 'en'), { displayText: 'Best', spokenText: 'Best', matchedCatalog: true });
+  assert.deepEqual(visionModule.getPslResultPresentation(match, 'ur'), { displayText: 'بہترین', spokenText: 'بہترین', matchedCatalog: true });
+  assert.deepEqual(visionModule.getPslResultPresentation(match, 'roman'), { displayText: 'Behtareen', spokenText: 'بہترین', matchedCatalog: true });
+  const otherEn = { ...match, description: 'Thumbs up — often signals approval.', spokenDescription: 'Thumbs up — often signals approval.', gesture: 'other' };
+  assert.deepEqual(visionModule.getPslResultPresentation(otherEn, 'en'), { displayText: otherEn.description, spokenText: otherEn.spokenDescription, matchedCatalog: false });
+  const otherUr = { ...match, description: 'انگوٹھا اوپر منظوری ظاہر کرتا ہے۔', spokenDescription: 'انگوٹھا اوپر منظوری ظاہر کرتا ہے۔', gesture: 'other' };
+  assert.deepEqual(visionModule.getPslResultPresentation(otherUr, 'ur'), { displayText: otherUr.description, spokenText: otherUr.spokenDescription, matchedCatalog: false });
 });
 
 test('raw Hindi, unsafe text, malformed shapes and extra result keys never reach the visible state', async () => {

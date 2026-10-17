@@ -1,12 +1,12 @@
 [
-  { "id": "best", "nameEn": "Best", "nameUr": "بہترین", "visualCue": "One raised thumb with the remaining fingers closed; the second hand rests near the waist." },
-  { "id": "fail", "nameEn": "Fail", "nameUr": "ناکام", "visualCue": "One closed hand at shoulder height with its thumb pointing down; the other forearm crosses the torso." },
-  { "id": "free", "nameEn": "Free", "nameUr": "آزاد", "visualCue": "Both hands raised; thumb and index finger form a circle on each hand while the other fingers extend." },
-  { "id": "hi", "nameEn": "Hi", "nameUr": "سلام", "visualCue": "One open hand raised beside the face, palm toward the camera and fingers spread." },
-  { "id": "home", "nameEn": "Home", "nameUr": "گھر", "visualCue": "Both hands rise toward the lower face with fingertips approaching at the center." },
-  { "id": "meet", "nameEn": "Meet", "nameUr": "ملنا", "visualCue": "Both hands come together in front of the upper chest, with extended fingertips meeting." },
-  { "id": "sorry", "nameEn": "Sorry", "nameUr": "معذرت", "visualCue": "One closed fist rests against the chest while the other hand stays lower near the torso." },
-  { "id": "thanks", "nameEn": "Thank you", "nameUr": "شکریہ", "visualCue": "Both hands overlap or cross in front of the chest, fingers touching the opposite palm." },
-  { "id": "wait", "nameEn": "Wait", "nameUr": "انتظار", "visualCue": "One index finger is held upright while the remaining fingers close; the other hand stays near the torso." },
-  { "id": "welcome", "nameEn": "Welcome", "nameUr": "خوش آمدید", "visualCue": "Both hands are open and held forward near the waist, palms facing upward." }
+  { "id": "best", "nameEn": "Best", "nameUr": "بہترین", "nameRoman": "Behtareen", "visualCue": "One raised thumb with the remaining fingers closed; the second hand rests near the waist." },
+  { "id": "fail", "nameEn": "Fail", "nameUr": "ناکام", "nameRoman": "Nakaam", "visualCue": "One closed hand at shoulder height with its thumb pointing down; the other forearm crosses the torso." },
+  { "id": "free", "nameEn": "Free", "nameUr": "آزاد", "nameRoman": "Azad", "visualCue": "Both hands raised; thumb and index finger form a circle on each hand while the other fingers extend." },
+  { "id": "hi", "nameEn": "Hi", "nameUr": "سلام", "nameRoman": "Salam", "visualCue": "One open hand raised beside the face, palm toward the camera and fingers spread." },
+  { "id": "home", "nameEn": "Home", "nameUr": "گھر", "nameRoman": "Ghar", "visualCue": "Both hands rise toward the lower face with fingertips approaching at the center." },
+  { "id": "meet", "nameEn": "Meet", "nameUr": "ملنا", "nameRoman": "Milna", "visualCue": "Both hands come together in front of the upper chest, with extended fingertips meeting." },
+  { "id": "sorry", "nameEn": "Sorry", "nameUr": "معذرت", "nameRoman": "Maazrat", "visualCue": "One closed fist rests against the chest while the other hand stays lower near the torso." },
+  { "id": "thanks", "nameEn": "Thank you", "nameUr": "شکریہ", "nameRoman": "Shukriya", "visualCue": "Both hands overlap or cross in front of the chest, fingers touching the opposite palm." },
+  { "id": "wait", "nameEn": "Wait", "nameUr": "انتظار", "nameRoman": "Intezaar", "visualCue": "One index finger is held upright while the remaining fingers close; the other hand stays near the torso." },
+  { "id": "welcome", "nameEn": "Welcome", "nameUr": "خوش آمدید", "nameRoman": "Khush Aamdeed", "visualCue": "Both hands are open and held forward near the waist, palms facing upward." }
 ]

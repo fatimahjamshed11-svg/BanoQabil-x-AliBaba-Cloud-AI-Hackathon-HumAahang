@@ -1,9 +1,16 @@
 import { validateCaptionBaseUrl, type CaptionCredential } from './caption-client.ts';
+import signCatalog from '../shared/psl-sign-catalog.json' with { type: 'json' };
 
 export type VisionLanguage = 'ur' | 'en' | 'roman';
 export type VisionTask = 'objects' | 'gesture';
 export type VisionPhoto = { base64: string; mimeType: 'image/jpeg' | 'image/png' | 'image/webp' };
 export type VisionResult = { task: VisionTask; description: string; spokenDescription: string; objects: string[]; gesture: string | null; uncertain: boolean };
+export function getPslResultPresentation(result: VisionResult, language: VisionLanguage) {
+  const sign = result.task === 'gesture' ? signCatalog.find(entry => entry.id === result.gesture) : undefined;
+  if (!sign) return { displayText: result.description, spokenText: result.spokenDescription, matchedCatalog: false };
+  const meaning = language === 'ur' ? sign.nameUr : language === 'roman' ? sign.nameRoman : sign.nameEn;
+  return { displayText: meaning, spokenText: language === 'roman' ? sign.nameUr : meaning, matchedCatalog: true };
+}
 export type VisionState = { phase: 'idle' | 'analyzing' | 'translating' | 'ready' | 'error'; result: VisionResult | null; language: VisionLanguage | null;
   translatingTo: VisionLanguage | null; message: string; needsConnection: boolean };
 export const idleVision: VisionState = { phase: 'idle', result: null, language: null, translatingTo: null, message: '', needsConnection: false };
