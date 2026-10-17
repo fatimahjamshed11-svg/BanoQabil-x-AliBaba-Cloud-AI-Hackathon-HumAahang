@@ -86,10 +86,6 @@ Live captions|براہِ راست تحریر|Barah-e-raast tehreer
 English + Urdu|انگریزی اور اردو|English aur Urdu
 Sign Assistant|اشاروں کا معاون|Isharon ka muawin
 Practice mode · Beta|مشق کا طریقہ · آزمائشی|Mashq ka tareeqa · Aazmaishi
-Today’s goal|آج کا ہدف|Aaj ka hadaf
-Edit goal|ہدف بدلیں|Hadaf badlein
-Complete one conversation|ایک گفتگو مکمل کریں|Aik guftagu mukammal karein
-1 of 2 activities|۲ میں سے ۱ سرگرمی|2 mein se 1 sargarmi
 Quick actions|فوری اختیارات|Fori ikhtiyarat
 Quick Speak|فوری آواز|Fori aawaz
 AI Vision|مصنوعی ذہانت سے منظر شناسی|AI se manzar shanasi
@@ -424,3 +420,4 @@ The microphone did not start. Check microphone permission and your device speech
 This speech language is unavailable on your device. Install the speech language in device settings or use keyboard dictation.|آپ کے آلے پر اس زبان کی صوتی شناخت دستیاب نہیں۔ آلے کی ترتیبات میں یہ زبان نصب کریں یا کی بورڈ سے بول کر لکھیں۔|Aap ke device par is zabaan ki speech shanakht dastiyab nahin. Device ki tarteebat mein yeh zabaan install karein ya keyboard se bol kar likhein.
 Unavailable|دستیاب نہیں|Dastiyab nahin
 `.trim().split('\n').map(line => line.split('|') as [string, string, string]);
+
