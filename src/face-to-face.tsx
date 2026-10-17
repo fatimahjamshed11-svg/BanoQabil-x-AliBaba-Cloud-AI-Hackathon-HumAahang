@@ -1,7 +1,7 @@
 import { Pressable, Text, TextInput, SafeAreaView, Ionicons, useLocale } from './localized-ui';
 
 import * as Speech from 'expo-speech';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -10,6 +10,7 @@ import type { useSpeechInput } from './use-speech-input';
 import { colors } from './theme';
 import { FtfMotion } from './ftf-motion';
 import { PartnerKeyboard } from './partner-keyboard';
+import { initialFtfUiState, reduceFtfUiState } from './ftf-ui-state';
 
 const phrases = ['Yes', 'No', 'Thank you', 'Please call my family', 'Please type your response', 'Please help me'];
 type Props = {
@@ -33,7 +34,8 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
   const recordingSender = voice.busy ? voice.owner : null;
   const [reading, setReading] = useState<{ sender: Sender; id: number } | null>(null);
   const [barOwner, setBarOwner] = useState<Sender>('you');
-  const [activeTyping, setActiveTyping] = useState<'none' | 'you' | 'partner'>('none');
+  const [layout, dispatchLayout] = useReducer(reduceFtfUiState, initialFtfUiState);
+  const { activeTyping, partnerKeyboardOpen } = layout;
   const initialLastId = useRef(messages.at(-1)?.id ?? 0);
   const youInput = useRef<TextInput>(null);
   const partnerInput = useRef<TextInput>(null);
@@ -160,7 +162,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
           accessibilityLabel={name + ': ' + t('Tap to expand')}
           onPress={() => {
             setBarOwner(sender);
-            setActiveTyping(sender);
+            dispatchLayout({ type: 'expand-collapsed', sender });
             if (sender === 'you') {
               youInput.current?.focus();
             }
@@ -221,7 +223,13 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
               </View>
               <IconButton icon="close" label={name + ': ' + t('Close phrases')} onPress={() => setEditor(null)} />
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.phrases}>
+            <ScrollView
+              testID={'ftf-phrase-list-' + sender}
+              style={s.phraseList}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={s.phrases}
+            >
               {phrases.map(phrase => (
                 <Pressable
                   key={phrase}
@@ -290,7 +298,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
             </ScrollView>
           )}
 
-          {sender === 'partner' && activeTyping === 'partner' ? (
+          {sender === 'partner' && partnerKeyboardOpen ? (
             <View style={s.partnerTypingContainer}>
               <View style={s.partnerDraftRow}>
                 <View style={s.partnerDraftBox}>
@@ -301,7 +309,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                 <IconButton
                   icon="close"
                   label={t('Close keyboard')}
-                  onPress={() => setActiveTyping('none')}
+                  onPress={() => dispatchLayout({ type: 'restore-split' })}
                 />
               </View>
               <PartnerKeyboard
@@ -310,7 +318,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                 onSend={val => {
                   send('partner', val, true);
                 }}
-                onClose={() => setActiveTyping('none')}
+                onClose={() => dispatchLayout({ type: 'restore-split' })}
                 defaultLanguage={language === 'اردو' ? 'ur' : 'en'}
               />
             </View>
@@ -332,7 +340,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                   onPress={() => {
                     setBarOwner('partner');
                     setEditor(null);
-                    setActiveTyping('partner');
+                    dispatchLayout({ type: 'focus-input', sender: 'partner' });
                   }}
                   style={[s.inputShell, !!drafts[sender].trim() && s.inputActive]}
                 >
@@ -362,11 +370,11 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                     onFocus={() => {
                       setBarOwner(sender);
                       setEditor(null);
-                      setActiveTyping('you');
+                      dispatchLayout({ type: 'focus-input', sender: 'you' });
                     }}
                     onBlur={() => {
                       if (activeTyping === 'you' && !drafts.you.trim()) {
-                        setActiveTyping('none');
+                        dispatchLayout({ type: 'restore-split' });
                       }
                     }}
                     placeholder={t('Type a message…')}
@@ -399,7 +407,12 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
                     return;
                   }
                   setBarOwner(sender);
-                  setEditor(choosing ? null : { sender, mode: 'phrases' });
+                  if (choosing) {
+                    setEditor(null);
+                  } else {
+                    dispatchLayout({ type: 'open-phrases', sender });
+                    setEditor({ sender, mode: 'phrases' });
+                  }
                 }}
               />
             </View>
@@ -428,7 +441,7 @@ export function FaceToFace({ messages, drafts, labels, onDraft, onSend, onBack, 
               accessibilityHint="Only the central navigation rotates. Message senders stay the same."
               onPress={() => {
                 if (activeTyping !== 'none') {
-                  setActiveTyping('none');
+                  dispatchLayout({ type: 'restore-split' });
                 } else {
                   setBarOwner(previous => (previous === 'you' ? 'partner' : 'you'));
                 }
@@ -533,6 +546,7 @@ const s = StyleSheet.create({
   pickerHeading: { paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.mintBright },
   pickerHint: { fontSize: 11, lineHeight: 16, color: colors.ink, marginTop: 2 },
   pickerTitle: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  phraseList: { flex: 1, minHeight: 0 },
   phrases: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   phrase: { minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   phraseText: { flex: 1, fontSize: 15, lineHeight: 22, color: colors.ink },

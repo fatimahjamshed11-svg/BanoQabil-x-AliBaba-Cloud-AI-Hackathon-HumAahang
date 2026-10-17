@@ -10,7 +10,7 @@ Visual source: user's hand-drawn FTF reference supplied September 5, 2026.
 - Both viewports read the same ordered messages. A message is outgoing only in its author's viewport; incoming messages have a read-aloud action.
 - Centre bar contains Back, Face-to-face/flip, and Chat. Tapping its flip control changes only this bar's orientation. Focusing or using a person's composer also makes the bar face that person. This does not change sender identity or rotate the two histories.
 - Wireframe legend symbols map to semantic Ionicons microphone, chat-bubble and volume controls; no extra imagery or decorative assets are needed.
-- Phrase selection uses a mint surface with a contrasting heading and explicit sender label, not the appearance of chat history.
+- Phrase selection uses a mint surface with a contrasting heading and explicit sender label, not the appearance of chat history. Opening it expands the selected person's pane; its phrase list scrolls within the space above the fixed composer. Opening Partner phrases does not open the custom keyboard.
 - Both histories follow the newest message after content changes, viewport changes, and returning from phrase selection. Scrolling is scheduled after layout, with reduced-motion support.
 
 ## Ownership and architecture
