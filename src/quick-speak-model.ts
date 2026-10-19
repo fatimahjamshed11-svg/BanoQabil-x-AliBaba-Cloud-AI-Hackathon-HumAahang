@@ -49,7 +49,11 @@ export function createPhrasePlayback(engine: PlaybackEngine, onState: (state: Pl
         void engine.stop().catch(() => {});
       }, 12000);
       try {
-        await engine.stop();
+        // Stop/cancel executes synchronously in browser speech engines. Do not
+        // await its Promise before speak(): Android Chrome can otherwise lose
+        // the transient user activation from the button tap and reject speech.
+        const stopping = engine.stop();
+        void stopping.catch(() => {});
         if (current !== token || disposed) return;
         engine.speak(spokenValue.trim(), {
           language: /[\u0600-\u06ff]/.test(spokenValue) ? 'ur-PK' : 'en-US',

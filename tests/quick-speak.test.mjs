@@ -38,15 +38,17 @@ test('playback waits for onStart; switching phrases ignores stale completion; St
   player.dispose();
 });
 
-test('stopping while engine startup is pending prevents a late utterance', async () => {
-  let release, speaks = 0;
-  const player = createPhrasePlayback({ stop: () => new Promise(resolve => { release = resolve; }), speak: () => { speaks++; } }, () => {});
-  const pending = player.speak('Do not speak after stop');
-  const initial = release;
+test('starts speech synchronously after requesting stop so mobile Chrome keeps the tap activation', async () => {
+  const actions = [];
+  const player = createPhrasePlayback({
+    stop: () => { actions.push('stop'); return Promise.resolve(); },
+    speak: () => { actions.push('speak'); },
+  }, () => {});
+  const pending = player.speak('Speak from this tap');
+  assert.deepEqual(actions, ['stop', 'speak']);
   player.stop();
-  initial();
   await pending;
-  assert.equal(speaks, 0);
+  assert.deepEqual(actions, ['stop', 'speak', 'stop']);
   player.dispose();
 });
 
