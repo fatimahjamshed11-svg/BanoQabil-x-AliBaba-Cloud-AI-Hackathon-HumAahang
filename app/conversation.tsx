@@ -51,7 +51,7 @@ function ReadyConversation() {
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [showSessionDetails, setShowSessionDetails] = useState(false);
   const [drafts, setDrafts] = useState<Record<Sender, string>>({ you: '', partner: '' });
-  const voice = useSpeechInput((owner, value) => setDrafts(previous => ({ ...previous, [owner]: value })));
+  const voice = useSpeechInput((owner, value) => setDrafts(previous => ({ ...previous, [owner]: value })), false, face);
   const recordingSender = voice.busy ? voice.owner : null;
   const [speechLocale, setSpeechLocale] = useState(language === 'English' ? 'en-US' : 'ur-PK');
   useEffect(() => { voice.cancel(); setSpeechLocale(language === 'English' ? 'en-US' : 'ur-PK'); }, [language, voice.cancel]);

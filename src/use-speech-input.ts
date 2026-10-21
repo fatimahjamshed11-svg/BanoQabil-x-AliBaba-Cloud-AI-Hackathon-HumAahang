@@ -5,14 +5,15 @@ import { createSpeechInput, idleSpeech, type SpeechStartConfig } from './speech-
 import { permissionRequired, speechEngine, speechUnavailable } from './speech-engine';
 import type { Sender } from './conversation-model';
 
-export function useSpeechInput(onDraft: (owner: Sender, text: string) => void, continuous = false) {
+export function useSpeechInput(onDraft: (owner: Sender, text: string) => void, continuous = false, holdUntilStop = false) {
   const [state, setState] = useState(idleSpeech);
   const draftCallback = useRef(onDraft);
   draftCallback.current = onDraft;
   const controller = useRef<ReturnType<typeof createSpeechInput> | null>(null);
   useEffect(() => {
+    setState(idleSpeech);
     const input = createSpeechInput(speechEngine, {
-      permissionRequired, continuous, unavailable: speechUnavailable(), onState: setState,
+      permissionRequired, continuous, holdUntilStop, unavailable: speechUnavailable(), onState: setState,
       onDraft: (owner, text) => draftCallback.current(owner, text),
     });
     controller.current = input;
@@ -20,7 +21,7 @@ export function useSpeechInput(onDraft: (owner: Sender, text: string) => void, c
       if (status === 'background') input.cancel();
     });
     return () => { subscription.remove(); input.dispose(); controller.current = null; };
-  }, [continuous]);
+  }, [continuous, holdUntilStop]);
   useFocusEffect(useCallback(() => () => controller.current?.cancel(), []));
   const start = useCallback((owner: Sender, draft: string, locale: string | SpeechStartConfig) => { void controller.current?.start(owner, draft, locale); }, []);
   const stop = useCallback(() => controller.current?.stop(), []);

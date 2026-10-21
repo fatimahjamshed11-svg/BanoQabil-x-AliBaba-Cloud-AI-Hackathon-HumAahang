@@ -10,10 +10,13 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
   unavailable?: string;
   permissionRequired: boolean;
   continuous?: boolean;
+  holdUntilStop?: boolean;
   onState(state: SpeechInputState): void;
   onDraft(owner: Sender, text: string): void;
 }) {
   type Session = { owner: Sender; draft: string; preview: string; final: string; started: boolean; cancelled: boolean; error: string; round: number; acknowledged: boolean; heard: boolean; emptyEnds: number };
+  const persistent = !!(options.continuous || options.holdUntilStop);
+  const listeningMessage = options.holdUntilStop ? 'Listening. Take your time; tap the mic again to finish.' : 'Listening. Speak a sentence, then pause or tap Stop.';
   let session: Session | null = null;
   let disposed = false;
   let phase: SpeechInputState['phase'] = 'idle';
@@ -32,7 +35,7 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
     if (session !== current) return;
     clear();
     session = null;
-    const text = (current.final || current.preview).trim();
+    const text = (options.holdUntilStop ? current.preview || current.final : current.final || current.preview).trim();
     if (!disposed && !current.cancelled && !current.error && text) {
       options.onDraft(current.owner, [current.draft.trimEnd(), text].filter(Boolean).join(' '));
     }
@@ -95,13 +98,19 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
             engine.addListener('start', () => {
               if (!isCurrent() || current.cancelled || current.error || phase === 'stopping') return;
               current.acknowledged = true;
-              if (options.continuous) clearTimeout(timer);
-              publish(current, 'listening', 'Listening. Speak a sentence, then pause or tap Stop.');
+              if (persistent) clearTimeout(timer);
+              publish(current, 'listening', listeningMessage);
             }),
             engine.addListener('result', event => {
               if (!isCurrent() || current.cancelled || current.error) return;
               const text = event.results[0]?.transcript.trim() || '';
               if (text) { current.heard = true; current.emptyEnds = 0; }
+              if (options.holdUntilStop) {
+                if (event.isFinal) current.final = [current.final, text].filter(Boolean).join(' ');
+                current.preview = event.isFinal ? current.final : [current.final, text].filter(Boolean).join(' ');
+                publish(current, phase, phase === 'stopping' ? 'Finishing speech…' : listeningMessage);
+                return;
+              }
               if (options.continuous && event.isFinal) {
                 if (text) options.onDraft(current.owner, text);
                 current.preview = '';
@@ -111,10 +120,12 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
               }
               if (event.isFinal) current.final = text;
               current.preview = text;
-              publish(current, phase, phase === 'stopping' ? 'Finishing speech…' : 'Listening. Speak a sentence, then pause or tap Stop.');
+              publish(current, phase, phase === 'stopping' ? 'Finishing speech…' : listeningMessage);
             }),
             engine.addListener('error', event => {
               if (!isCurrent()) return;
+              // Silence is a recognizer boundary, not the user's Stop action.
+              if (options.holdUntilStop && !current.cancelled && (event.error === 'no-speech' || event.error === 'speech-timeout')) return;
               if (!current.cancelled) current.error = speechError(event.error);
               publish(current, 'stopping', current.error || 'Cancelling voice input…');
               clearTimeout(timer);
@@ -124,16 +135,21 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
               if (!isCurrent()) return;
               current.started = false;
               // A device sentence/session boundary is not a user-requested pause.
-              if (options.continuous && phase !== 'stopping' && !current.cancelled && !current.error) {
+              if (persistent && phase !== 'stopping' && !current.cancelled && !current.error) {
                 if (!current.acknowledged) {
                   current.error = 'The microphone did not start. Check microphone permission and your device speech service, then retry.';
-                } else if (!current.heard && ++current.emptyEnds > 2) {
+                } else if (!options.holdUntilStop && !current.heard && ++current.emptyEnds > 2) {
                   current.error = 'No speech heard after several attempts. Check your microphone, then tap Retry.';
                 } else {
-                  const text = (current.final || current.preview).trim();
-                  if (text) options.onDraft(current.owner, text);
-                  current.preview = '';
-                  current.final = '';
+                  const text = (options.holdUntilStop ? current.preview || current.final : current.final || current.preview).trim();
+                  if (options.holdUntilStop) {
+                    current.final = text;
+                    current.preview = text;
+                  } else {
+                    if (text) options.onDraft(current.owner, text);
+                    current.preview = '';
+                    current.final = '';
+                  }
                   ++current.round; // Ignore callbacks queued by the previous device session.
                   clear();
                   publish(current, 'reconnecting', 'Reconnecting to device speech…');
@@ -145,7 +161,7 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
             }),
           ];
           current.started = true;
-          timer = options.continuous ? setTimeout(() => {
+          timer = persistent ? setTimeout(() => {
             if (!isCurrent()) return;
             current.error = 'The microphone did not start. Check microphone permission and your device speech service, then retry.';
             finish(current);
@@ -153,7 +169,7 @@ export function createSpeechInput(engine: RecognitionEngine | null, options: {
           }, 15000) : setTimeout(stop, 30000);
           try {
             const config = typeof language === 'string' ? { lang: language } : language;
-            engine.start({ ...config, interimResults: true, continuous: !!options.continuous, maxAlternatives: 1 });
+            engine.start({ ...config, interimResults: true, continuous: persistent, maxAlternatives: 1 });
           } catch {
             current.error = 'Could not start speech input. Check microphone access and your device speech service, or type instead.';
             finish(current);

@@ -347,6 +347,7 @@ Cancelling voice input…|آواز منسوخ ہو رہی ہے…|Aawaz mansookh
 Allow microphone access to start speaking.|بولنے کے لیے مائیک کی اجازت دیں۔|Bolne ke liye mic ki ijazat dein.
 Speech recognition is unavailable here. Use a supported browser or type your message.|یہاں آواز کی شناخت دستیاب نہیں۔ موزوں براؤزر استعمال کریں یا پیغام لکھیں۔|Yahan aawaz ki shanakht dastiyab nahin. Munasib browser istemal karein ya paigham likhein.
 Listening. Speak a sentence, then pause or tap Stop.|سن رہا ہے۔ جملہ بولیں، پھر رکیں یا بند کریں دبائیں۔|Sun raha hai. Jumla bolein, phir rukein ya Band karein dabayen.
+Listening. Take your time; tap the mic again to finish.|سن رہا ہے۔ آرام سے بولیں؛ ختم کرنے کے لیے مائیک دوبارہ دبائیں۔|Sun raha hai. Aaram se bolein; khatam karne ke liye mic dobara dabayen.
 Listening for the next sentence…|اگلا جملہ سن رہا ہے…|Agla jumla sun raha hai…
 Could not start speech input. Check microphone access and your device speech service, or type instead.|آواز شروع نہیں ہو سکی۔ مائیک کی اجازت اور آلے کی صوتی سہولت چیک کریں یا لکھیں۔|Aawaz shuru nahin ho saki. Mic ki ijazat aur device ki sauti sahulat check karein ya likhein.
 Microphone or speech permission was denied. Allow it in browser/app settings, then try again. You can still type.|مائیک یا آواز کی اجازت نہیں ملی۔ براؤزر یا ایپ کی ترتیبات میں اجازت دے کر کوشش کریں۔ آپ لکھ سکتے ہیں۔|Mic ya aawaz ki ijazat nahin mili. Browser ya app ki tarteebat mein ijazat de kar koshish karein. Aap likh sakte hain.

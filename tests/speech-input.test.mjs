@@ -2,6 +2,49 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createSpeechInput } from '../src/speech-input.ts';
 
+test('manual-stop dictation survives long pauses and commits all segments only on stop', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let stops = 0;
+  const h = setup({ stop() { stops++; } }, { holdUntilStop: true });
+  await h.input.start('partner', 'Existing', 'en-US');
+  h.emit('start');
+  h.emit('result', { isFinal: true, results: [{ transcript: 'First sentence.' }] });
+  context.mock.timers.tick(120000);
+  assert.equal(stops, 0);
+  for (let i = 0; i < 5; i++) {
+    h.emit('error', { error: 'no-speech' });
+    h.emit('end');
+    context.mock.timers.tick(350);
+    h.emit('start');
+  }
+  assert.equal(h.states.at(-1).phase, 'listening');
+  h.emit('result', { isFinal: false, results: [{ transcript: 'Second' }] });
+  assert.deepEqual(h.drafts, []);
+  h.input.stop();
+  h.emit('result', { isFinal: true, results: [{ transcript: 'Second sentence.' }] });
+  h.emit('end');
+  assert.equal(stops, 1);
+  assert.deepEqual(h.drafts, [['partner', 'Existing First sentence. Second sentence.']]);
+  h.input.dispose();
+});
+
+test('manual-stop dictation stops or cancels during reconnect without restarting', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  for (const action of ['stop', 'cancel', 'dispose']) {
+    let starts = 0;
+    const h = setup({ start() { starts++; } }, { holdUntilStop: true });
+    await h.input.start('you', '', 'ur-PK');
+    h.emit('start');
+    h.emit('result', { isFinal: true, results: [{ transcript: 'Hello' }] });
+    h.emit('end');
+    h.input[action]();
+    context.mock.timers.tick(1000);
+    assert.equal(starts, 1);
+    assert.deepEqual(h.drafts, action === 'stop' ? [['you', 'Hello']] : []);
+    h.input.dispose();
+  }
+});
+
 function setup(overrides = {}, options = {}) {
   const listeners = new Map();
   const engine = {
